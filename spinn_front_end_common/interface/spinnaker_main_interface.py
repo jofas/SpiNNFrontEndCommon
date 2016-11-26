@@ -4,6 +4,7 @@ main interface for the spinnaker tools
 
 # pacman imports
 from pacman.model.graphs.abstract_virtual_vertex import AbstractVirtualVertex
+import datetime
 from pacman.model.graphs.application.impl.application_graph \
     import ApplicationGraph
 from pacman.model.graphs.machine.impl.machine_graph import MachineGraph
@@ -414,6 +415,12 @@ class SpinnakerMainInterface(object):
         self._shutdown()
         return sys.__excepthook__(exctype, value, traceback_obj)
 
+    def capture_image(self, name):
+        os.system("usbreset /dev/bus/usb/003/007")
+        now = datetime.datetime.now().isoformat()
+        os.system("streamer -c /dev/video0 -s640x480 -o {}{}{}_{}.jpeg".format(
+            self._report_default_directory, os.sep, now, name))
+
     def run(self, run_time):
         """
 
@@ -426,6 +433,9 @@ class SpinnakerMainInterface(object):
         sys.excepthook = sys.__excepthook__
 
         logger.info("Starting execution process")
+
+        # Capture an image to start the run
+        self.capture_image("00_start")
 
         n_machine_time_steps = None
         total_run_time = None
@@ -466,7 +476,9 @@ class SpinnakerMainInterface(object):
 
             if self._machine is None:
                 self._get_machine(total_run_time, n_machine_time_steps)
+            self.capture_image("01_before_mapping")
             self._do_mapping(run_time, n_machine_time_steps, total_run_time)
+            self.capture_image("02_after_mapping")
 
         # Check if anything is recording and buffered
         is_buffered_recording = False
@@ -536,18 +548,24 @@ class SpinnakerMainInterface(object):
 
             # Data generation needs to be done if not already done
             if not self._has_ran or application_graph_changed:
+                self.capture_image("03_before_data_generation")
                 self._do_data_generation(steps[0])
+                self.capture_image("04_after_data_generation")
 
             # If we are using a virtual board, don't load
             if not self._use_virtual_board:
+                self.capture_image("05_before_load")
                 self._do_load()
+                self.capture_image("06_after_load")
 
         # Run for each of the given steps
+        self.capture_image("07_before_run")
         logger.info("Running for {} steps for a total of {} ms".format(
             len(steps), run_time))
         for i, step in enumerate(steps):
             logger.info("Run {} of {}".format(i + 1, len(steps)))
             self._do_run(step)
+        self.capture_image("08_after_run")
 
         # Indicate that the signal handler needs to act
         self._raise_keyboard_interrupt = False
@@ -1746,9 +1764,9 @@ class SpinnakerMainInterface(object):
         :type extract_iobuf: bool
         :return: None
         """
-
+        self.capture_image("09_before_provenance")
         if extract_provenance_data:
-            
+
             # turn off reinjector before extracting provenance data, otherwise
             # its highly possible when things are going wrong, that the data
             # extracted from the reinjector is changing.
@@ -1763,6 +1781,7 @@ class SpinnakerMainInterface(object):
 
         self._shutdown(
             turn_off_machine, clear_routing_tables, clear_tags)
+        self.capture_image("10_end")
 
     def _add_socket_address(self, socket_address):
         """
