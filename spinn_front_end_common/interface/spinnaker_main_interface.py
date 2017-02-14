@@ -1041,16 +1041,17 @@ class SpinnakerMainInterface(object):
 
     def _do_data_generation(self, n_machine_time_steps):
 
-        # The initial inputs are the mapping outputs
-        inputs = dict(self._mapping_outputs)
-        inputs["FirstMachineTimeStep"] = self._current_run_timesteps
+        if self._dsg_algorithm is not None:
+            # The initial inputs are the mapping outputs
+            inputs = dict(self._mapping_outputs)
+            inputs["FirstMachineTimeStep"] = self._current_run_timesteps
 
-        # Run the data generation algorithms
-        algorithms = [self._dsg_algorithm]
+            # Run the data generation algorithms
+            algorithms = [self._dsg_algorithm]
 
-        executor = self._run_machine_algorithms(inputs, algorithms, [])
-        self._mapping_outputs = executor.get_items()
-        self._pacman_provenance.extract_provenance(executor)
+            executor = self._run_machine_algorithms(inputs, algorithms, [])
+            self._mapping_outputs = executor.get_items()
+            self._pacman_provenance.extract_provenance(executor)
 
     def _do_load(self):
 
@@ -1710,6 +1711,7 @@ class SpinnakerMainInterface(object):
                     logger.info("Turning off machine")
 
                 self._txrx.close(power_off_machine=turn_off_machine)
+                self._txrx = None
 
             if self._machine_allocation_controller is not None:
                 self._machine_allocation_controller.close()
