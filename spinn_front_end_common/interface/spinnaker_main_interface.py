@@ -484,10 +484,12 @@ class SpinnakerMainInterface(object):
         return sys.__excepthook__(exctype, value, traceback_obj)
 
     def capture_image(self, name):
-        os.system("usbreset /dev/bus/usb/003/007")
+        os.system("usbreset /dev/bus/usb/003/005")
         now = datetime.datetime.now().isoformat()
-        os.system("streamer -c /dev/video0 -s640x480 -o {}{}{}_{}.jpeg".format(
-            self._report_default_directory, os.sep, now, name))
+        image = "{}{}{}_{}.jpeg".format(
+            self._report_default_directory, os.sep, now, name)
+        os.system("streamer -c /dev/video0 -s640x480 -o {}".format(image))
+        os.system("convert -rotate 180 {} {}".format(image, image))
 
     def run(self, run_time):
         """
@@ -1870,7 +1872,7 @@ class SpinnakerMainInterface(object):
         :rtype: None
         """
         self.capture_image("09_before_provenance")
-        
+
         # If we have run forever, stop the binaries
         if (self._has_ran and self._current_run_timesteps is None and
                 not self._use_virtual_board):
