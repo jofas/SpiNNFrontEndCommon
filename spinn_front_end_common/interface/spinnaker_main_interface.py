@@ -484,7 +484,7 @@ class SpinnakerMainInterface(object):
         return sys.__excepthook__(exctype, value, traceback_obj)
 
     def capture_image(self, name):
-        os.system("usbreset /dev/bus/usb/003/005")
+        os.system("usbreset /dev/bus/usb/003/007")
         now = datetime.datetime.now().isoformat()
         image = "{}{}{}_{}.jpeg".format(
             self._report_default_directory, os.sep, now, name)
