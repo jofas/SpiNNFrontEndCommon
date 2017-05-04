@@ -4,14 +4,21 @@ main interface for the spinnaker tools
 
 # pacman imports
 from pacman.model.graphs.abstract_virtual_vertex import AbstractVirtualVertex
+from pacman.model.graphs.application.application_edge import \
+    ApplicationEdge
 from pacman.model.placements.placements import Placements
-from pacman.model.graphs.application.impl.application_graph \
-    import ApplicationGraph
-from pacman.model.graphs.machine.impl.machine_graph import MachineGraph
+from pacman.model.graphs.application import ApplicationGraph
+from pacman.model.graphs.machine import MachineGraph
 from pacman.executor.pacman_algorithm_executor import PACMANAlgorithmExecutor
 from pacman.exceptions import PacmanAlgorithmFailedToCompleteException
 
 # common front end imports
+from spinn_front_end_common.abstract_models.\
+    abstract_send_me_multicast_commands_vertex import \
+    AbstractSendMeMulticastCommandsVertex
+from spinn_front_end_common.abstract_models.\
+    abstract_vertex_with_dependent_vertices import \
+    AbstractVertexWithEdgeToDependentVertices
 from spinn_front_end_common.utilities import exceptions as common_exceptions
 from spinn_front_end_common.utilities import helpful_functions
 from spinn_front_end_common.interface.buffer_management\
@@ -23,6 +30,8 @@ from spinn_front_end_common.abstract_models.abstract_changable_after_run \
     import AbstractChangableAfterRun
 from spinn_front_end_common.interface.provenance.pacman_provenance_extractor \
     import PacmanProvenanceExtractor
+from spinn_front_end_common.utility_models.command_sender import CommandSender
+
 from spinn_front_end_common.interface.interface_functions\
     .front_end_common_provenance_xml_writer \
     import FrontEndCommonProvenanceXMLWriter
@@ -59,6 +68,7 @@ import sys
 import traceback
 import signal
 import datetime
+
 
 logger = logging.getLogger(__name__)
 
@@ -257,10 +267,19 @@ class SpinnakerMainInterface(object):
         "_app_data_top_simulation_folder",
 
         #
+        "_command_sender",
+
+        # Run for infinite time
+        "_infinite_run",
+
+        # iobuf cores
+        "_cores_to_read_iobuf",
+
+        #
         "_all_provenance_items",
 
         #
-        "_executable_start_type"
+        "_executable_start_type",
     ]
 
     def __init__(
@@ -285,6 +304,9 @@ class SpinnakerMainInterface(object):
         self._spalloc_server = None
         self._remote_spinnaker_url = None
         self._machine_allocation_controller = None
+
+        # command sender vertex
+        self._command_sender = None
 
         # update graph label if needed
         if graph_label is None:
@@ -360,6 +382,7 @@ class SpinnakerMainInterface(object):
         self._machine_time_step = None
         self._time_scale_factor = None
         self._this_run_time_string = None
+        self._infinite_run = False
 
         self._app_id = helpful_functions.read_config_int(
             config, "Machine", "appID")
@@ -434,6 +457,8 @@ class SpinnakerMainInterface(object):
     def set_up_machine_specifics(self, hostname):
         """ Adds machine specifics for the different modes of execution
 
+        :param hostname: machine name
+        :rtype: None
         """
         if hostname is not None:
             self._hostname = hostname
@@ -471,7 +496,12 @@ class SpinnakerMainInterface(object):
                     "A spalloc_user must be specified with a spalloc_server")
 
     def signal_handler(self, signal, frame):
+        """ handles closing down of script via keyboard interrupt
 
+        :param signal: the signal received
+        :param frame: frame executed in
+        :return:  None
+        """
         # If we are to raise the keyboard interrupt, do so
         if self._raise_keyboard_interrupt:
             raise KeyboardInterrupt
@@ -480,6 +510,12 @@ class SpinnakerMainInterface(object):
         self._shutdown()
 
     def exception_handler(self, exctype, value, traceback_obj):
+        """ handler of exceptions
+
+        :param exctype:  the type of execution received
+        :param value: the value of the exception
+        :param traceback_obj: the trace back stuff
+        """
         self._shutdown()
         return sys.__excepthook__(exctype, value, traceback_obj)
 
@@ -492,7 +528,7 @@ class SpinnakerMainInterface(object):
         os.system("convert -rotate 180 {} {}".format(image, image))
 
     def run(self, run_time):
-        """
+        """ main call for running a simulation for a given time frame
 
         :param run_time: the run duration in milliseconds.
         :rtype: None
@@ -516,6 +552,7 @@ class SpinnakerMainInterface(object):
 
         n_machine_time_steps = None
         total_run_time = None
+        self._infinite_run = True
         if run_time is not None:
             n_machine_time_steps = int(
                 (run_time * 1000.0) / self._machine_time_step)
@@ -525,6 +562,7 @@ class SpinnakerMainInterface(object):
                 total_run_timesteps *
                 (float(self._machine_time_step) / 1000.0) *
                 self._time_scale_factor)
+            self._infinite_run = False
         if self._machine_allocation_controller is not None:
             self._machine_allocation_controller.extend_allocation(
                 total_run_time)
@@ -548,6 +586,10 @@ class SpinnakerMainInterface(object):
                 raise NotImplementedError(
                     "The network cannot be changed between runs without"
                     " resetting")
+
+            if not self._has_ran:
+                self._add_dependent_verts_and_edges_for_application_graph()
+                self._add_commands_to_command_sender()
 
             # Reset the machine graph if there is an application graph
             if self._application_graph.n_vertices > 0:
@@ -625,6 +667,10 @@ class SpinnakerMainInterface(object):
                 steps = self._deduce_number_of_iterations(n_machine_time_steps)
                 self._minimum_step_generated = steps[0]
 
+        # Keep track of if loading was done; if loading is done before run,
+        # run doesn't need to rewrite data again
+        loading_done = False
+
         # If we have never run before, or the graph has changed, or a reset
         # has been requested, load the data
         if (not self._has_ran or application_graph_changed or
@@ -640,6 +686,7 @@ class SpinnakerMainInterface(object):
             if not self._use_virtual_board:
                 self.capture_image("05_before_load")
                 self._do_load()
+                loading_done = True
                 self.capture_image("06_after_load")
 
         # Run for each of the given steps
@@ -648,7 +695,7 @@ class SpinnakerMainInterface(object):
             len(steps), run_time))
         for i, step in enumerate(steps):
             logger.info("Run {} of {}".format(i + 1, len(steps)))
-            self._do_run(step)
+            self._do_run(step, loading_done)
         self.capture_image("08_after_run")
 
         # Indicate that the signal handler needs to act
@@ -658,8 +705,52 @@ class SpinnakerMainInterface(object):
         # update counter for runs (used by reports and app data)
         self._n_calls_to_run += 1
 
-    def _deduce_number_of_iterations(self, n_machine_time_steps):
+    def _add_commands_to_command_sender(self):
+        for vertex in self._application_graph.vertices:
+            if isinstance(vertex, AbstractSendMeMulticastCommandsVertex):
+                # if there's no command sender yet, build one
+                if self._command_sender is None:
+                    self._command_sender = CommandSender(
+                        "auto_added_command_sender", None)
+                    self.add_application_vertex(self._command_sender)
 
+                # allow the command sender to create key to partition map
+                self._command_sender.add_commands(
+                    vertex.start_resume_commands,
+                    vertex.pause_stop_commands,
+                    vertex.timed_commands, vertex)
+
+        # add the edges from the command sender to the dependent vertices
+        if self._command_sender is not None:
+            edges, partition_ids = \
+                self._command_sender.edges_and_partitions()
+            for edge, partition_id in zip(edges, partition_ids):
+                self.add_application_edge(edge, partition_id)
+
+    def _add_dependent_verts_and_edges_for_application_graph(self):
+        for vertex in self._application_graph.vertices:
+            # add any dependent edges and vertices if needed
+            if isinstance(vertex, AbstractVertexWithEdgeToDependentVertices):
+                for dependant_vertex in vertex.dependent_vertices():
+                    self.add_application_vertex(dependant_vertex)
+                    edge_partition_identifiers = vertex.\
+                        edge_partition_identifiers_for_dependent_vertex(
+                            dependant_vertex)
+                    for edge_identifier in edge_partition_identifiers:
+                        dependant_edge = ApplicationEdge(
+                            pre_vertex=vertex,
+                            post_vertex=dependant_vertex)
+                        self.add_application_edge(
+                            dependant_edge, edge_identifier)
+
+    def _deduce_number_of_iterations(self, n_machine_time_steps):
+        """ operates the auto pause and resume functionality by figuring out\
+            how many timer ticks a simulation can run before sdram runs out,\
+            and breaks simulation into chunks of that long.
+
+        :param n_machine_time_steps: the total timer ticks to be ran
+        :return: list of timer steps.
+        """
         # Go through the placements and find how much SDRAM is available
         # on each chip
         sdram_tracker = dict()
@@ -697,6 +788,12 @@ class SpinnakerMainInterface(object):
 
     @staticmethod
     def _generate_steps(n_machine_time_steps, min_machine_time_steps):
+        """ generates the list of timer runs
+
+        :param n_machine_time_steps: the total runtime in machine time steps
+        :param min_machine_time_steps: the min allowed per chunk
+        :return: list of time steps
+        """
         number_of_full_iterations = int(math.floor(
             n_machine_time_steps / min_machine_time_steps))
         left_over_time_steps = int(
@@ -737,6 +834,14 @@ class SpinnakerMainInterface(object):
 
     def _run_machine_algorithms(
             self, inputs, algorithms, outputs, optional_algorithms=None):
+        """ runs getting a spinnaker machine logic
+
+        :param inputs: the inputs
+        :param algorithms: algorithms to call
+        :param outputs: outputs to get
+        :param optional_algorithms: optional algorithms to use
+        :return:  None
+        """
 
         optional = optional_algorithms
         if optional is None:
@@ -794,26 +899,13 @@ class SpinnakerMainInterface(object):
         # If we are using a directly connected machine, add the details to get
         # the machine and transceiver
         if self._hostname is not None:
+            self._handle_machine_common_config(inputs)
             inputs["IPAddress"] = self._hostname
             inputs["BMPDetails"] = self._read_config("Machine", "bmp_names")
-            down_chips, down_cores = \
-                helpful_functions.convert_string_info_chip_and_core_subsets(
-                    self._config.get("Machine", "down_chips"),
-                    self._config.get("Machine", "down_cores"))
-            inputs["DownedChipsDetails"] = down_chips
-            inputs["DownedCoresDetails"] = down_cores
-            inputs["DownedLinksDetails"] = self._convert_down_links(
-                self._config.get("Machine", "down_links"))
             inputs["AutoDetectBMPFlag"] = self._config.getboolean(
                 "Machine", "auto_detect_bmp")
             inputs["ScampConnectionData"] = self._read_config(
                 "Machine", "scamp_connections_data")
-            inputs["BootPortNum"] = self._read_config_int(
-                "Machine", "boot_connection_port_num")
-            inputs["BoardVersion"] = self._read_config_int(
-                "Machine", "version")
-            inputs["ResetMachineOnStartupFlag"] = self._config.getboolean(
-                "Machine", "reset_machine_on_startup")
             inputs["MaxCoreId"] = self._read_config_int(
                 "Machine", "core_limit")
 
@@ -830,28 +922,19 @@ class SpinnakerMainInterface(object):
             self._machine_outputs = executor.get_items()
 
         if self._use_virtual_board:
+            self._handle_machine_common_config(inputs)
             inputs["IPAddress"] = "virtual"
-            inputs["BoardVersion"] = self._read_config_int(
-                "Machine", "version")
             inputs["NumberOfBoards"] = self._read_config_int(
                 "Machine", "number_of_boards")
             inputs["MachineWidth"] = self._read_config_int(
                 "Machine", "width")
             inputs["MachineHeight"] = self._read_config_int(
                 "Machine", "height")
+            inputs["MachineHasWrapAroundsFlag"] = self._read_config_boolean(
+                "Machine", "requires_wrap_arounds")
             inputs["BMPDetails"] = None
-            inputs["DownedChipsDetails"] = self._config.get(
-                "Machine", "down_chips")
-            inputs["DownedCoresDetails"] = self._config.get(
-                "Machine", "down_cores")
-            inputs["DownedLinksDetails"] = self._convert_down_links(
-                self._config.get("Machine", "down_links"))
             inputs["AutoDetectBMPFlag"] = False
             inputs["ScampConnectionData"] = None
-            inputs["BootPortNum"] = self._read_config_int(
-                "Machine", "boot_connection_port_num")
-            inputs["ResetMachineOnStartupFlag"] = self._config.getboolean(
-                "Machine", "reset_machine_on_startup")
             inputs["MemoryTransceiver"] = None
             if self._config.getboolean("Machine", "enable_reinjection"):
                 inputs["CPUsPerVirtualChip"] = 15
@@ -967,39 +1050,26 @@ class SpinnakerMainInterface(object):
 
         return self._machine
 
-    def _convert_down_links(self, down_link_text):
-        """ Converts the text form to a list of down links
+    def _handle_machine_common_config(self, inputs):
+        """ adds common parts of the machine configuration
 
-        :param down_link_text: the text from the config system
-        :return:\
-            array of (tuple(int, int), tuple(int, int), int) where the\
-            first tuple is the source x and y for the chip the link is from,\
-            the second is a destination x and y for the chip the link goes to,\
-            the third is the link id from the source chip.
+        :param inputs: the input dict
+        :rtype: None
         """
-        down_links = list()
-        if down_link_text == "None":
-            return down_links
-
-        bits = down_link_text.split("]")
-        for bit in bits:
-            if len(bit) > 0:
-                removed_first_bracket = bit.split("[")
-                coords_bits = removed_first_bracket[1].split(":")
-                source_bits = coords_bits[0].split(",")
-                removed_bracket_sx = source_bits[0].split("(")[1]
-                removed_bracket_sy = source_bits[1].split(")")[0]
-                source_tuple = (int(removed_bracket_sx),
-                                int(removed_bracket_sy))
-                dest_bits = coords_bits[1].split(",")
-                removed_bracket_dx = dest_bits[0].split("(")[1]
-                removed_bracket_dy = dest_bits[1].split(")")[0]
-                dest_tuple = (int(removed_bracket_dx),
-                              int(removed_bracket_dy))
-                link_id = int(coords_bits[2])
-                down_links.append((source_tuple, dest_tuple, link_id))
-        print bits
-        return down_links
+        down_chips, down_cores, down_links = \
+            helpful_functions.sort_out_downed_chips_cores_links(
+                self._config.get("Machine", "down_chips"),
+                self._config.get("Machine", "down_cores"),
+                self._config.get("Machine", "down_links"))
+        inputs["DownedChipsDetails"] = down_chips
+        inputs["DownedCoresDetails"] = down_cores
+        inputs["DownedLinksDetails"] = down_links
+        inputs["BoardVersion"] = self._read_config_int(
+            "Machine", "version")
+        inputs["ResetMachineOnStartupFlag"] = self._config.getboolean(
+            "Machine", "reset_machine_on_startup")
+        inputs["BootPortNum"] = self._read_config_int(
+            "Machine", "boot_connection_port_num")
 
     def generate_file_machine(self):
         inputs = {
@@ -1055,12 +1125,12 @@ class SpinnakerMainInterface(object):
         inputs["WriteTextSpecsFlag"] = self._config.getboolean(
             "Reports", "writeTextSpecs")
         inputs["ExecutableFinder"] = self._executable_finder
-        inputs["MachineHasWrapAroundsFlag"] = self._read_config_boolean(
-            "Machine", "requires_wrap_arounds")
         inputs["UserCreateDatabaseFlag"] = self._config.get(
             "Database", "create_database")
         inputs["SendStartNotifications"] = self._config.getboolean(
             "Database", "send_start_notification")
+        inputs["SendStopNotifications"] = self._config.getboolean(
+            "Database", "send_stop_notification")
 
         # add paths for each file based version
         inputs["FileCoreAllocationsFilePath"] = os.path.join(
@@ -1098,6 +1168,10 @@ class SpinnakerMainInterface(object):
                 optional_algorithms.append("unCompressedRoutingTableReports")
                 optional_algorithms.append("compressedRoutingTableReports")
                 optional_algorithms.append("comparisonOfRoutingTablesReport")
+            if self._config.getboolean(
+                    "Reports", "writeRoutingTablesFromMachineReport"):
+                optional_algorithms.append(
+                    "FrontEndCommonRoutingTableFromMachineReport")
 
             # only add partitioner report if using an application graph
             if (self._config.getboolean(
@@ -1119,10 +1193,8 @@ class SpinnakerMainInterface(object):
             # only add network specification report if there's
             # application vertices.
             if (self._config.getboolean(
-                    "Reports", "writeNetworkSpecificationReport") and
-                    self._application_graph.n_vertices != 0):
-                algorithms.append(
-                    "FrontEndCommonApplicationGraphNetworkSpecificationReport")
+                    "Reports", "writeNetworkSpecificationReport")):
+                algorithms.append("NetworkSpecificationReport")
 
         # Add algorithm to clear routing tables and set up routing
         if not self._use_virtual_board:
@@ -1214,11 +1286,6 @@ class SpinnakerMainInterface(object):
 
         # add report for extracting routing table from machine report if needed
         algorithms = list(self._extra_load_algorithms)
-        if self._config.getboolean("Reports", "reportsEnabled"):
-            if self._config.getboolean(
-                    "Reports", "writeRoutingTablesFromMachineReport"):
-                algorithms.append(
-                    "FrontEndCommonRoutingTableFromMachineReport")
 
         optional_algorithms = list()
         optional_algorithms.append("FrontEndCommonRoutingTableLoader")
@@ -1229,12 +1296,19 @@ class SpinnakerMainInterface(object):
             if self._config.getboolean("Reports", "writeMemoryMapReport"):
                 optional_algorithms.append(
                     "FrontEndCommonMemoryMapOnHostReport")
+                optional_algorithms.append(
+                    "FrontEndCommonMemoryMapOnHostChipReport")
         else:
             optional_algorithms.append(
                 "FrontEndCommonMachineExecuteDataSpecification")  # @IgnorePep8
             if self._config.getboolean("Reports", "writeMemoryMapReport"):
                 optional_algorithms.append(
                     "FrontEndCommonMemoryMapOnChipReport")
+
+        # Reload any parameters over the loaded data if we have already
+        # run and not using a virtual board
+        if self._has_ran and not self._use_virtual_board:
+            optional_algorithms.append("FrontEndCommonDSGRegionReloader")
 
         # algorithms needed for loading the binaries to the SpiNNaker machine
         optional_algorithms.append("FrontEndCommonLoadExecutableImages")
@@ -1250,7 +1324,7 @@ class SpinnakerMainInterface(object):
             inputs, algorithms, outputs, optional_algorithms)
         self._load_outputs = executor.get_items()
 
-    def _do_run(self, n_machine_time_steps):
+    def _do_run(self, n_machine_time_steps, loading_done):
 
         # calculate number of machine time steps
         total_run_timesteps = self._calculate_number_of_machine_time_steps(
@@ -1298,6 +1372,14 @@ class SpinnakerMainInterface(object):
             if self._config.getboolean("Reports", "clear_iobuf_during_run"):
                 algorithms.append("FrontEndCommonChipIOBufClearer")
 
+        # Reload any parameters over the loaded data if we have already
+        # run and not using a virtual board and the data hasn't already
+        # been regenerated during a load
+        if (self._has_ran and not self._use_virtual_board and
+                not loading_done):
+            algorithms.append("FrontEndCommonDSGRegionReloader")
+
+        # Update the run time if not using a virtual board
         if (not self._use_virtual_board and
                 self._executable_start_type ==
                 ExecutableStartType.USES_SIMULATION_INTERFACE):
@@ -1390,12 +1472,17 @@ class SpinnakerMainInterface(object):
             # If an exception occurs during a run, attempt to get
             # information out of the simulation before shutting down
             try:
-
-                # Only do this if the error occurred in the run
-                if not run_complete and not self._use_virtual_board:
-                    self._recover_from_error(
-                        e, ex_traceback, executor.get_item(
-                            "ExecutableTargets"))
+                if executor is not None:
+                    # Only do this if the error occurred in the run
+                    if not run_complete and not self._use_virtual_board:
+                        self._recover_from_error(
+                            e, ex_traceback, executor.get_item(
+                                "ExecutableTargets"))
+                else:
+                    logger.error(
+                        "The PACMAN executor crashing during initialisation,"
+                        " please read previous error message to locate its"
+                        " error")
             except Exception:
                 logger.error("Error when attempting to recover from error")
                 traceback.print_exc()
@@ -1476,6 +1563,15 @@ class SpinnakerMainInterface(object):
             # Attempt to force the cores to write provenance and exit
             updater = FrontEndCommonChipProvenanceUpdater()
             updater(self._txrx, self._app_id, non_rte_core_subsets)
+
+            inputs = self._last_run_outputs
+            inputs["CoresToExtractIOBufFrom"] = \
+                helpful_functions.translate_iobuf_extraction_elements(
+                    self._config.get("Reports", "extract_iobuf_from_cores"),
+                    self._config.get(
+                        "Reports", "extract_iobuf_from_binary_types"),
+                    self._last_run_outputs["ExecutableTargets"],
+                    self._executable_finder)
 
             # Extract any written provenance data
             extracter = FrontEndCommonPlacementsProvenanceGatherer()
@@ -1851,6 +1947,7 @@ class SpinnakerMainInterface(object):
                     logger.info("Turning off machine")
 
                 self._txrx.close(power_off_machine=turn_off_machine)
+                self._txrx = None
 
             if self._machine_allocation_controller is not None:
                 self._machine_allocation_controller.close()
@@ -1880,6 +1977,8 @@ class SpinnakerMainInterface(object):
             algorithms = []
             outputs = []
 
+            # stop any binaries that need to be notified of the simulation
+            # stopping if in infinite run
             if (self._executable_start_type ==
                     ExecutableStartType.USES_SIMULATION_INTERFACE):
                 algorithms.append("FrontEndCommonApplicationFinisher")
@@ -1939,7 +2038,7 @@ class SpinnakerMainInterface(object):
                     logger.error("Error when attempting to recover from error")
                     traceback.print_exc()
 
-        # shut down the tools.
+        # shut down the machine properly
         self._shutdown(
             turn_off_machine, clear_routing_tables, clear_tags)
         self.capture_image("10_end")
@@ -1984,3 +2083,15 @@ class SpinnakerMainInterface(object):
     def _read_config_boolean(self, section, item):
         return helpful_functions.read_config_boolean(
             self._config, section, item)
+
+    @property
+    def has_reset_last(self):
+        return self._has_reset_last
+
+    @property
+    def config(self):
+        """ helper method for the  front end impls till we remove config
+
+        :return:
+        """
+        return self._config
