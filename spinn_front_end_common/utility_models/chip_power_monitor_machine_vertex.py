@@ -111,11 +111,11 @@ class ChipPowerMonitorMachineVertex(
             config, "Buffers", "receive_buffer_port")
 
         # figure max buffer size
-        max_buffer_size = 0
+        maximum_sdram_for_buffering = None
         if config.getboolean("Buffers", "enable_buffered_recording"):
             max_buffer_size = config.getint(
                 "Buffers", "spike_buffer_size")
-        maximum_sdram_for_buffering = [max_buffer_size]
+            maximum_sdram_for_buffering = [max_buffer_size]
 
         # figure recording size for max run
         n_recording_entries = math.ceil(
@@ -132,7 +132,7 @@ class ChipPowerMonitorMachineVertex(
             cpu_cycles=CPUCyclesPerTickResource(100),
             dtcm=DTCMResource(100))
         recording_sizes = recording_utilities.get_recording_region_sizes(
-            [recording_size, 1], n_machine_time_steps, minimum_buffer_sdram,
+            [recording_size], n_machine_time_steps, minimum_buffer_sdram,
             maximum_sdram_for_buffering, using_auto_pause_and_resume)
         container.extend(recording_utilities.get_recording_resources(
             recording_sizes, receive_buffer_host, receive_buffer_port))
