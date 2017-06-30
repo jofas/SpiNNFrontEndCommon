@@ -3,16 +3,20 @@ main interface for the spinnaker tools
 """
 
 # pacman imports
-from pacman.model.graphs.abstract_virtual_vertex import AbstractVirtualVertex
-from pacman.model.graphs.application.application_edge import \
-    ApplicationEdge
-from pacman.model.placements.placements import Placements
-from pacman.model.graphs.application import ApplicationGraph
-from pacman.model.graphs.machine import MachineGraph
+from pacman.executor.injection_decorator import provide_injectables, \
+    clear_injectables
+from pacman.model.graphs import AbstractVirtualVertex
+from pacman.model.placements import Placements
 from pacman.executor.pacman_algorithm_executor import PACMANAlgorithmExecutor
 from pacman.exceptions import PacmanAlgorithmFailedToCompleteException
+from pacman.model.graphs.application import ApplicationGraph
+from pacman.model.graphs.application import ApplicationEdge
+from pacman.model.graphs.application import ApplicationVertex
+from pacman.model.graphs.machine import MachineGraph, MachineVertex
 
 # common front end imports
+from pacman.model.resources.pre_allocated_resource_container import \
+    PreAllocatedResourceContainer
 from spinn_front_end_common.abstract_models.\
     abstract_send_me_multicast_commands_vertex import \
     AbstractSendMeMulticastCommandsVertex
@@ -21,6 +25,12 @@ from spinn_front_end_common.abstract_models.\
     AbstractVertexWithEdgeToDependentVertices
 from spinn_front_end_common.utilities import exceptions as common_exceptions
 from spinn_front_end_common.utilities import helpful_functions
+from spinn_front_end_common.utilities import globals_variables
+from spinn_front_end_common.utilities.report_functions.\
+    front_end_common_energy_report import \
+    FrontEndCommonEnergyReport
+from spinn_front_end_common.utilities.simulator_interface \
+    import SimulatorInterface
 from spinn_front_end_common.interface.buffer_management\
     .buffer_models.abstract_receive_buffers_to_host \
     import AbstractReceiveBuffersToHost
@@ -31,7 +41,6 @@ from spinn_front_end_common.abstract_models.abstract_changable_after_run \
 from spinn_front_end_common.interface.provenance.pacman_provenance_extractor \
     import PacmanProvenanceExtractor
 from spinn_front_end_common.utility_models.command_sender import CommandSender
-
 from spinn_front_end_common.interface.interface_functions\
     .front_end_common_provenance_xml_writer \
     import FrontEndCommonProvenanceXMLWriter
@@ -54,6 +63,7 @@ from spinn_front_end_common.utilities.utility_objs.executable_start_type \
     import ExecutableStartType
 
 # spinnman imports
+from spinn_utilities.timer import Timer
 from spinnman.model.enums.cpu_state import CPUState
 
 # spinnmachine imports
@@ -67,13 +77,12 @@ import os
 import sys
 import traceback
 import signal
-import datetime
 
 
 logger = logging.getLogger(__name__)
 
 
-class SpinnakerMainInterface(object):
+class AbstractSpinnakerBase(SimulatorInterface):
     """ Main interface into the tools logic flow
     """
 
@@ -280,6 +289,29 @@ class SpinnakerMainInterface(object):
 
         #
         "_executable_start_type",
+
+        # mapping between parameters and the vertices which need to talk to
+        # them
+        "_live_packet_recorder_params",
+
+        # place holder for checking the vertices being added to the recorders
+        # tracker are all of the same vertex type.
+        "_live_packet_recorders_associated_vertex_type",
+
+        # the time the process takes to do mapping
+        "_mapping_time",
+
+        # the time the process takes to do load
+        "_load_time",
+
+        # the time takes to execute the simulation
+        "_execute_time",
+
+        # time takes to do data generation
+        "_dsg_time",
+
+        # time taken by the front end extracting things
+        "_extraction_time"
     ]
 
     def __init__(
@@ -291,6 +323,13 @@ class SpinnakerMainInterface(object):
 
         # global params
         self._config = config
+
+        # timings
+        self._mapping_time = 0.0
+        self._load_time = 0.0
+        self._execute_time = 0.0
+        self._dsg_time = 0.0
+        self._extraction_time = 0.0
 
         self._executable_finder = executable_finder
 
@@ -307,6 +346,10 @@ class SpinnakerMainInterface(object):
 
         # command sender vertex
         self._command_sender = None
+
+        # store for Live Packet Gatherers
+        self._live_packet_recorder_params = defaultdict(list)
+        self._live_packet_recorders_associated_vertex_type = None
 
         # update graph label if needed
         if graph_label is None:
@@ -425,6 +468,41 @@ class SpinnakerMainInterface(object):
 
         # Setup for signal handling
         self._raise_keyboard_interrupt = False
+
+        globals_variables.set_simulator(self)
+
+    def add_extraction_timing(self, timing):
+        ms = helpful_functions.convert_time_diff_to_total_milliseconds(timing)
+        self._extraction_time += ms
+
+    def add_live_packet_gatherer_parameters(
+            self, live_packet_gatherer_params, vertex_to_record_from):
+        """ adds params for a new LPG if needed, or adds to the tracker for\
+         same params.
+
+        :param live_packet_gatherer_params: params to look for a LPG
+        :param vertex_to_record_from: the vertex that needs to send to a\
+         given LPG
+        :rtype: None
+        """
+        self._live_packet_recorder_params[live_packet_gatherer_params].append(
+            vertex_to_record_from)
+
+        # verify that the vertices being added are of one vertex type.
+        if self._live_packet_recorders_associated_vertex_type is None:
+            if isinstance(vertex_to_record_from, ApplicationVertex):
+                self._live_packet_recorders_associated_vertex_type = \
+                    ApplicationVertex
+            else:
+                self._live_packet_recorders_associated_vertex_type = \
+                    MachineVertex
+        else:
+            if not isinstance(
+                    vertex_to_record_from,
+                    self._live_packet_recorders_associated_vertex_type):
+                raise common_exceptions.ConfigurationException(
+                    "Only one type of graph can be used during live output. "
+                    "Please fix and try again")
 
     def _set_up_output_folders(self):
         """ Sets up the outgoing folders (reports and app data) by creating\
@@ -598,8 +676,8 @@ class SpinnakerMainInterface(object):
 
             # Reset the machine if the machine is a spalloc machine and the
             # graph has changed
-            if (application_graph_changed and self._hostname is None and
-                    not self._use_virtual_board):
+            if (self._has_ran and application_graph_changed and
+                    self._hostname is None and not self._use_virtual_board):
 
                 # wipe out stuff associated with a given machine, as these need
                 # to be rebuilt.
@@ -755,9 +833,17 @@ class SpinnakerMainInterface(object):
         # on each chip
         sdram_tracker = dict()
         vertex_by_chip = defaultdict(list)
+
+        # horrible hack. This needs to be fixed somehow
+        provide_injectables(
+            {"MachineTimeStep": self._machine_time_step,
+             "TotalMachineTimeSteps": n_machine_time_steps,
+             "TimeScaleFactor": self._time_scale_factor})
+
         for placement in self._placements.placements:
             vertex = placement.vertex
             if isinstance(vertex, AbstractReceiveBuffersToHost):
+
                 resources = vertex.resources_required
                 if (placement.x, placement.y) not in sdram_tracker:
                     sdram_tracker[placement.x, placement.y] = \
@@ -781,6 +867,10 @@ class SpinnakerMainInterface(object):
                     sdram_per_vertex, self._machine_time_step)
                 if min_time_steps is None or n_time_steps < min_time_steps:
                     min_time_steps = n_time_steps
+
+        # clear injectable
+        clear_injectables()
+
         if min_time_steps is None:
             return [n_machine_time_steps]
         else:
@@ -832,14 +922,16 @@ class SpinnakerMainInterface(object):
                         "is not currently supported")
         return total_run_timesteps
 
-    def _run_machine_algorithms(
-            self, inputs, algorithms, outputs, optional_algorithms=None):
+    def _run_algorithms(
+            self, inputs, algorithms, outputs, provenance_name,
+            optional_algorithms=None):
         """ runs getting a spinnaker machine logic
 
         :param inputs: the inputs
         :param algorithms: algorithms to call
         :param outputs: outputs to get
         :param optional_algorithms: optional algorithms to use
+        :param provenance_name: the name for provenance
         :return:  None
         """
 
@@ -851,7 +943,8 @@ class SpinnakerMainInterface(object):
         executor = PACMANAlgorithmExecutor(
             algorithms=algorithms, optional_algorithms=optional,
             inputs=inputs, xml_paths=self._xml_paths, required_outputs=outputs,
-            do_timings=self._do_timings, print_timings=self._print_timings)
+            do_timings=self._do_timings, print_timings=self._print_timings,
+            provenance_name=provenance_name)
 
         try:
             executor.execute_mapping()
@@ -869,13 +962,29 @@ class SpinnakerMainInterface(object):
             ex_type, ex_value, ex_traceback = sys.exc_info()
             raise ex_type, ex_value, ex_traceback
 
-    def _get_machine(self, total_run_time=0, n_machine_time_steps=None):
+    def _get_machine(self, total_run_time=0.0, n_machine_time_steps=None):
         if self._machine is not None:
             return self._machine
 
         inputs = dict()
         algorithms = list()
         outputs = list()
+
+        # add algorithms for handling LPG placement and edge insertion
+        if len(self._live_packet_recorder_params) != 0:
+            algorithms.append(
+                "FrontEndCommonPreAllocateResourcesForLivePacketGatherers")
+            inputs['LivePacketRecorderParameters'] = \
+                self._live_packet_recorder_params
+        if (self._config.getboolean("Reports", "reportsEnabled") and
+                self._config.getboolean("Reports", "write_energy_report")):
+            algorithms.append(
+                "FrontEndCommonPreAllocateResourcesForChipPowerMonitor")
+            inputs['MemorySamplingFrequency'] = self._config.getfloat(
+                "EnergyMonitor", "sampling_frequency")
+            inputs['MemoryNumberSamplesPerRecordingEntry'] = \
+                self._config.getfloat(
+                    "EnergyMonitor", "n_samples_per_recording_entry")
 
         # add the application and machine graphs as needed
         if self._application_graph.n_vertices > 0:
@@ -895,6 +1004,7 @@ class SpinnakerMainInterface(object):
         inputs["TotalRunTime"] = total_run_time
         inputs["TotalMachineTimeSteps"] = n_machine_time_steps
         inputs["MachineTimeStep"] = self._machine_time_step
+        inputs["TimeScaleFactor"] = self._time_scale_factor
 
         # If we are using a directly connected machine, add the details to get
         # the machine and transceiver
@@ -915,8 +1025,8 @@ class SpinnakerMainInterface(object):
             outputs.append("MemoryExtendedMachine")
             outputs.append("MemoryTransceiver")
 
-            executor = self._run_machine_algorithms(
-                inputs, algorithms, outputs)
+            executor = self._run_algorithms(
+                inputs, algorithms, outputs, "machine_generation")
             self._machine = executor.get_item("MemoryExtendedMachine")
             self._txrx = executor.get_item("MemoryTransceiver")
             self._machine_outputs = executor.get_items()
@@ -935,7 +1045,6 @@ class SpinnakerMainInterface(object):
             inputs["BMPDetails"] = None
             inputs["AutoDetectBMPFlag"] = False
             inputs["ScampConnectionData"] = None
-            inputs["MemoryTransceiver"] = None
             if self._config.getboolean("Machine", "enable_reinjection"):
                 inputs["CPUsPerVirtualChip"] = 15
             else:
@@ -946,8 +1055,8 @@ class SpinnakerMainInterface(object):
 
             outputs.append("MemoryExtendedMachine")
 
-            executor = self._run_machine_algorithms(
-                inputs, algorithms, outputs)
+            executor = self._run_algorithms(
+                inputs, algorithms, outputs, "machine_generation")
             self._machine_outputs = executor.get_items()
             self._machine = executor.get_item("MemoryExtendedMachine")
 
@@ -1000,8 +1109,7 @@ class SpinnakerMainInterface(object):
                 # chips to be allocated either by partitioning, or by measuring
                 # the graph
                 if self._application_graph.n_vertices != 0:
-                    inputs["MemoryApplicationGraph"] = \
-                        self._application_graph
+                    inputs["MemoryApplicationGraph"] = self._application_graph
                     algorithms.extend(self._config.get(
                         "Mapping",
                         "application_to_machine_graph_algorithms").split(","))
@@ -1021,6 +1129,7 @@ class SpinnakerMainInterface(object):
                 algorithms.append("FrontEndCommonSpallocAllocator")
             elif self._remote_spinnaker_url is not None:
                 algorithms.append("FrontEndCommonHBPAllocator")
+
             algorithms.append("FrontEndCommonMachineGenerator")
             algorithms.append("MallocBasedChipIDAllocator")
 
@@ -1029,8 +1138,8 @@ class SpinnakerMainInterface(object):
             outputs.append("MemoryTransceiver")
             outputs.append("MachineAllocationController")
 
-            executor = self._run_machine_algorithms(
-                inputs, algorithms, outputs)
+            executor = self._run_algorithms(
+                inputs, algorithms, outputs, "machine_generation")
 
             self._machine_outputs = executor.get_items()
             self._machine = executor.get_item("MemoryExtendedMachine")
@@ -1047,6 +1156,13 @@ class SpinnakerMainInterface(object):
 
         if self._txrx is not None and self._app_id is None:
             self._app_id = self._txrx.app_id_tracker.get_new_id()
+
+        if not self._use_virtual_board:
+            if helpful_functions.read_config_boolean(
+                    self._config, "EnergySavings",
+                    "turn_off_board_after_discovery"):
+                helpful_functions.turn_off_on_boards_for_energy_savings(
+                    self._txrx, self._machine_allocation_controller, False)
 
         return self._machine
 
@@ -1085,6 +1201,10 @@ class SpinnakerMainInterface(object):
         executor.execute_mapping()
 
     def _do_mapping(self, run_time, n_machine_time_steps, total_run_time):
+
+        # time the time it takes to do all pacman stuff
+        mapping_total_timer = Timer()
+        mapping_total_timer.start_timing()
 
         # update inputs with extra mapping inputs if required
         inputs = dict(self._machine_outputs)
@@ -1148,11 +1268,29 @@ class SpinnakerMainInterface(object):
         inputs["FileConstraintsFilePath"] = os.path.join(
             self._json_folder, "constraints.json")
 
+        algorithms = list()
+
+        if len(self._live_packet_recorder_params) != 0:
+            algorithms.append(
+                "FrontEndCommonInsertLivePacketGatherersToGraphs")
+            algorithms.append(
+                "FrontEndCommonInsertEdgesToLivePacketGatherers")
+            inputs['LivePacketRecorderParameters'] = \
+                self._live_packet_recorder_params
+
+        if (self._config.getboolean("Reports", "reportsEnabled") and
+                self._config.getboolean("Reports", "write_energy_report")):
+            algorithms.append(
+                "FrontEndCommonInsertChipPowerMonitorsToGraphs")
+            inputs['MemorySamplingFrequency'] = self._config.getfloat(
+                "EnergyMonitor", "sampling_frequency")
+            inputs['MemoryNumberSamplesPerRecordingEntry'] = \
+                self._config.getfloat(
+                    "EnergyMonitor", "n_samples_per_recording_entry")
+
         # handle extra mapping algorithms if required
         if self._extra_mapping_algorithms is not None:
-            algorithms = list(self._extra_mapping_algorithms)
-        else:
-            algorithms = list()
+            algorithms.extend(self._extra_mapping_algorithms)
 
         optional_algorithms = list()
 
@@ -1196,43 +1334,59 @@ class SpinnakerMainInterface(object):
                     "Reports", "writeNetworkSpecificationReport")):
                 algorithms.append("NetworkSpecificationReport")
 
-        # Add algorithm to clear routing tables and set up routing
-        if not self._use_virtual_board:
-            algorithms.append("FrontEndCommonRoutingSetup")
-
         # only add the partitioner if there isn't already a machine graph
         if (self._application_graph.n_vertices > 0 and
                 self._machine_graph.n_vertices == 0):
             algorithms.extend(self._config.get(
                 "Mapping",
                 "application_to_machine_graph_algorithms").split(","))
+            inputs['MemoryPreviousAllocatedResources'] = \
+                PreAllocatedResourceContainer()
 
-        algorithms.extend(self._config.get(
-            "Mapping", "machine_graph_to_machine_algorithms").split(","))
+        if self._use_virtual_board:
+            algorithms.extend(self._config.get(
+                "Mapping", "machine_graph_to_virtual_machine_algorithms").
+                split(","))
+        else:
+            algorithms.extend(self._config.get(
+                "Mapping", "machine_graph_to_machine_algorithms").split(","))
 
+        # handle outputs
         outputs = [
             "MemoryPlacements", "MemoryRoutingTables",
             "MemoryTags", "MemoryRoutingInfos",
-            "MemoryMachineGraph", "BufferManager"
+            "MemoryMachineGraph"
         ]
+
         if self._application_graph.n_vertices > 0:
             outputs.append("MemoryGraphMapper")
 
         # Create a buffer manager if there isn't one already
-        if self._buffer_manager is None:
-            inputs["WriteReloadFilesFlag"] = False
-            algorithms.append("FrontEndCommonBufferManagerCreator")
-        else:
-            inputs["BufferManager"] = self._buffer_manager
+        if not self._use_virtual_board:
+            if self._buffer_manager is None:
+                inputs["WriteReloadFilesFlag"] = False
+                algorithms.append("FrontEndCommonBufferManagerCreator")
+                outputs.append("BufferManager")
+            else:
+                inputs["BufferManager"] = self._buffer_manager
 
         # Get the executable targets
         optional_algorithms.append("FrontEndCommonGraphBinaryGatherer")
+
         outputs.append("ExecutableTargets")
         outputs.append("ExecutableStartType")
 
+        # turn on/off machine for energy savings
+        if not self._use_virtual_board:
+            power_value = helpful_functions.read_config_boolean(
+                self._config, "EnergySavings", "turn_off_board_during_mapping")
+            helpful_functions.turn_off_on_boards_for_energy_savings(
+                self._txrx, self._machine_allocation_controller,
+                not power_value)
+
         # Execute the mapping algorithms
-        executor = self._run_machine_algorithms(
-            inputs, algorithms, outputs, optional_algorithms)
+        executor = self._run_algorithms(
+            inputs, algorithms, outputs, "mapping", optional_algorithms)
 
         # get result objects from the pacman executor
         self._mapping_outputs = executor.get_items()
@@ -1244,10 +1398,20 @@ class SpinnakerMainInterface(object):
         self._routing_infos = executor.get_item("MemoryRoutingInfos")
         self._graph_mapper = executor.get_item("MemoryGraphMapper")
         self._machine_graph = executor.get_item("MemoryMachineGraph")
-        self._buffer_manager = executor.get_item("BufferManager")
         self._executable_start_type = executor.get_item("ExecutableStartType")
 
+        if not self._use_virtual_board:
+            self._buffer_manager = executor.get_item("BufferManager")
+
+        self._mapping_time += \
+            helpful_functions.convert_time_diff_to_total_milliseconds(
+                mapping_total_timer.take_sample())
+
     def _do_data_generation(self, n_machine_time_steps):
+
+        # set up timing
+        data_gen_timer = Timer()
+        data_gen_timer.start_timing()
 
         # The initial inputs are the mapping outputs
         inputs = dict(self._mapping_outputs)
@@ -1259,23 +1423,43 @@ class SpinnakerMainInterface(object):
         outputs = []
         algorithms = [self._dsg_algorithm]
 
-        if (self._config.get("Reports", "reportsEnabled") and
-                self._config.get("Reports", "writeProvenanceData")):
+        if (self._config.getboolean("Reports", "reportsEnabled") and
+                self._config.getboolean("Reports", "writeProvenanceData")):
             algorithms.append("FrontEndCommonGraphProvenanceGatherer")
             outputs.append("ProvenanceItems")
 
-        executor = self._run_machine_algorithms(inputs, algorithms, outputs)
+        # turn on/off machine for energy savings
+        if not self._use_virtual_board:
+            power_value = helpful_functions.read_config_boolean(
+                self._config, "EnergySavings", "turn_off_board_during_dsg")
+            helpful_functions.turn_off_on_boards_for_energy_savings(
+                self._txrx, self._machine_allocation_controller,
+                not power_value)
+
+        executor = self._run_algorithms(
+            inputs, algorithms, outputs, "data_generation")
         self._mapping_outputs = executor.get_items()
 
         # write provenance to file if necessary
-        if (self._config.get("Reports", "reportsEnabled") and
-                self._config.get("Reports", "writeProvenanceData") and
+        if (self._config.getboolean("Reports", "reportsEnabled") and
+                self._config.getboolean("Reports", "writeProvenanceData") and
                 not self._use_virtual_board):
             prov_items = executor.get_item("ProvenanceItems")
             self._write_provenance(prov_items)
             self._check_provenance(prov_items)
+        self._dsg_time += \
+            helpful_functions.convert_time_diff_to_total_milliseconds(
+                data_gen_timer.take_sample())
 
     def _do_load(self):
+        # set up timing
+        load_timer = Timer()
+        load_timer.start_timing()
+
+        # turn on machine for loading
+        if not self._use_virtual_board:
+            helpful_functions.turn_off_on_boards_for_energy_savings(
+                self._txrx, self._machine_allocation_controller, True)
 
         # The initial inputs are the mapping outputs
         inputs = dict(self._mapping_outputs)
@@ -1284,9 +1468,20 @@ class SpinnakerMainInterface(object):
             self._config.getboolean("Reports", "writeMemoryMapReport")
         )
 
-        # add report for extracting routing table from machine report if needed
-        algorithms = list(self._extra_load_algorithms)
+        algorithms = list()
 
+        # add report for extracting routing table from machine report if needed
+        # Add algorithm to clear routing tables and set up routing
+        if not self._use_virtual_board:
+            algorithms.append("FrontEndCommonRoutingSetup")
+
+        if helpful_functions.read_config(
+                self._config, "Mapping", "loading_algorithms") is not None:
+            algorithms.extend(
+                self._config.get("Mapping", "loading_algorithms").split(","))
+        algorithms.extend(self._extra_load_algorithms)
+
+        # add optional algorithms
         optional_algorithms = list()
         optional_algorithms.append("FrontEndCommonRoutingTableLoader")
         optional_algorithms.append("FrontEndCommonTagsLoader")
@@ -1320,11 +1515,19 @@ class SpinnakerMainInterface(object):
             "LoadedApplicationDataToken"
         ]
 
-        executor = self._run_machine_algorithms(
-            inputs, algorithms, outputs, optional_algorithms)
+        executor = self._run_algorithms(
+            inputs, algorithms, outputs, "loading", optional_algorithms)
         self._load_outputs = executor.get_items()
 
+        self._load_time += \
+            helpful_functions.convert_time_diff_to_total_milliseconds(
+                load_timer.take_sample())
+
     def _do_run(self, n_machine_time_steps, loading_done):
+
+        # start timer
+        run_timer = Timer()
+        run_timer.start_timing()
 
         # calculate number of machine time steps
         total_run_timesteps = self._calculate_number_of_machine_time_steps(
@@ -1349,12 +1552,15 @@ class SpinnakerMainInterface(object):
         inputs["RunTime"] = run_time
         inputs["FirstMachineTimeStep"] = self._current_run_timesteps
 
-        inputs["CoresToExtractIOBufFrom"] = \
-            helpful_functions.translate_iobuf_extraction_elements(
-                self._config.get("Reports", "extract_iobuf_from_cores"),
-                self._config.get("Reports", "extract_iobuf_from_binary_types"),
-                self._load_outputs["ExecutableTargets"],
-                self._executable_finder)
+        if not self._use_virtual_board:
+            inputs["CoresToExtractIOBufFrom"] = \
+                helpful_functions.translate_iobuf_extraction_elements(
+                    self._config.get(
+                        "Reports", "extract_iobuf_from_cores"),
+                    self._config.get(
+                        "Reports", "extract_iobuf_from_binary_types"),
+                    self._load_outputs["ExecutableTargets"],
+                    self._executable_finder)
 
         # update algorithm list with extra pre algorithms if needed
         if self._extra_pre_run_algorithms is not None:
@@ -1395,8 +1601,7 @@ class SpinnakerMainInterface(object):
             logger.warn("Reload script is not supported in this version")
 
         outputs = [
-            "NoSyncChanges",
-            "BufferManager"
+            "NoSyncChanges"
         ]
 
         if not self._use_virtual_board:
@@ -1416,8 +1621,8 @@ class SpinnakerMainInterface(object):
             outputs.append("IOBuffers")
 
         # add extractor of provenance if needed
-        if (self._config.get("Reports", "reportsEnabled") and
-                self._config.get("Reports", "writeProvenanceData") and
+        if (self._config.getboolean("Reports", "reportsEnabled") and
+                self._config.getboolean("Reports", "writeProvenanceData") and
                 not self._use_virtual_board and
                 n_machine_time_steps is not None):
             algorithms.append("FrontEndCommonPlacementsProvenanceGatherer")
@@ -1428,7 +1633,8 @@ class SpinnakerMainInterface(object):
         executor = PACMANAlgorithmExecutor(
             algorithms=algorithms, optional_algorithms=[], inputs=inputs,
             xml_paths=self._xml_paths, required_outputs=outputs,
-            do_timings=self._do_timings, print_timings=self._print_timings)
+            do_timings=self._do_timings, print_timings=self._print_timings,
+            provenance_name="Execution")
         try:
             executor.execute_mapping()
             self._pacman_provenance.extract_provenance(executor)
@@ -1443,8 +1649,9 @@ class SpinnakerMainInterface(object):
                 self._write_iobuf(executor.get_item("IOBuffers"))
 
             # write provenance to file if necessary
-            if (self._config.get("Reports", "reportsEnabled") and
-                    self._config.get("Reports", "writeProvenanceData") and
+            if (self._config.getboolean("Reports", "reportsEnabled") and
+                    self._config.getboolean(
+                        "Reports", "writeProvenanceData") and
                     not self._use_virtual_board and
                     n_machine_time_steps is not None):
                 prov_items = executor.get_item("ProvenanceItems")
@@ -1456,17 +1663,19 @@ class SpinnakerMainInterface(object):
             # move data around
             self._last_run_outputs = executor.get_items()
             self._current_run_timesteps = total_run_timesteps
-            self._last_run_outputs = executor.get_items()
             self._no_sync_changes = executor.get_item("NoSyncChanges")
             self._has_reset_last = False
             self._has_ran = True
+
+            self._execute_time += \
+                helpful_functions.convert_time_diff_to_total_milliseconds(
+                    run_timer.take_sample())
 
         except KeyboardInterrupt:
             logger.error("User has aborted the simulation")
             self._shutdown()
             sys.exit(1)
         except Exception as e:
-
             ex_type, ex_value, ex_traceback = sys.exc_info()
 
             # If an exception occurs during a run, attempt to get
@@ -1500,6 +1709,7 @@ class SpinnakerMainInterface(object):
     def _write_provenance(self, provenance_data_items):
         """ Write provenance to disk
         """
+        writer = None
         if self._provenance_format == "xml":
             writer = FrontEndCommonProvenanceXMLWriter()
         elif self._provenance_format == "json":
@@ -1564,15 +1774,6 @@ class SpinnakerMainInterface(object):
             updater = FrontEndCommonChipProvenanceUpdater()
             updater(self._txrx, self._app_id, non_rte_core_subsets)
 
-            inputs = self._last_run_outputs
-            inputs["CoresToExtractIOBufFrom"] = \
-                helpful_functions.translate_iobuf_extraction_elements(
-                    self._config.get("Reports", "extract_iobuf_from_cores"),
-                    self._config.get(
-                        "Reports", "extract_iobuf_from_binary_types"),
-                    self._last_run_outputs["ExecutableTargets"],
-                    self._executable_finder)
-
             # Extract any written provenance data
             extracter = FrontEndCommonPlacementsProvenanceGatherer()
             extracter(self._txrx, placements, True, prov_items)
@@ -1623,13 +1824,9 @@ class SpinnakerMainInterface(object):
             if os.path.exists(file_name):
                 mode = "a"
 
-            # open file and write iobuf to it.
-            writer = open(file_name, mode)
-            writer.write(iobuf.iobuf)
-
-            # close file.
-            writer.flush()
-            writer.close()
+            # write iobuf to file.
+            with open(file_name, mode) as writer:
+                writer.write(iobuf.iobuf)
 
     @staticmethod
     def _print_iobuf(errors, warnings):
@@ -1991,8 +2188,8 @@ class SpinnakerMainInterface(object):
                 outputs.append("IOBuffers")
 
             # add extractor of provenance if needed
-            if (self._config.get("Reports", "reportsEnabled") and
-                    self._config.get("Reports", "writeProvenanceData")):
+            if (self._config.getboolean("Reports", "reportsEnabled") and
+                    self._config.getboolean("Reports", "writeProvenanceData")):
                 algorithms.append("FrontEndCommonPlacementsProvenanceGatherer")
                 algorithms.append("FrontEndCommonRouterProvenanceGatherer")
                 outputs.append("ProvenanceItems")
@@ -2001,7 +2198,8 @@ class SpinnakerMainInterface(object):
             executor = PACMANAlgorithmExecutor(
                 algorithms=algorithms, optional_algorithms=[], inputs=inputs,
                 xml_paths=self._xml_paths, required_outputs=outputs,
-                do_timings=self._do_timings, print_timings=self._print_timings)
+                do_timings=self._do_timings, print_timings=self._print_timings,
+                provenance_name="stopping")
             run_complete = False
             try:
                 executor.execute_mapping()
@@ -2015,8 +2213,9 @@ class SpinnakerMainInterface(object):
                     self._write_iobuf(executor.get_item("IOBuffers"))
 
                 # write provenance to file if necessary
-                if (self._config.get("Reports", "reportsEnabled") and
-                        self._config.get("Reports", "writeProvenanceData")):
+                if (self._config.getboolean("Reports", "reportsEnabled") and
+                        self._config.getboolean(
+                            "Reports", "writeProvenanceData")):
                     prov_items = executor.get_item("ProvenanceItems")
                     prov_items.extend(self._pacman_provenance.data_items)
                     self._pacman_provenance.clear()
@@ -2038,6 +2237,37 @@ class SpinnakerMainInterface(object):
                     logger.error("Error when attempting to recover from error")
                     traceback.print_exc()
 
+        if (self._config.getboolean("Reports", "reportsEnabled") and
+                self._config.getboolean("Reports", "write_energy_report")):
+            energy_report = FrontEndCommonEnergyReport()
+
+            # acquire provenance items
+            if self._last_run_outputs is not None:
+                prov_items = self._last_run_outputs["ProvenanceItems"]
+                pacman_provenance = list()
+                router_provenance = list()
+
+                # group them by name type
+                grouped_items = sorted(
+                    prov_items, key=lambda item: item.names[0])
+                for element in grouped_items:
+                    if element.names[0] == 'pacman':
+                        pacman_provenance.append(element)
+                    if element.names[0] == 'router_provenance':
+                        router_provenance.append(element)
+
+                # run energy report
+                energy_report(
+                    self._placements, self._machine,
+                    self._report_default_directory,
+                    self._read_config("Machine", "version"),
+                    self._spalloc_server, self._remote_spinnaker_url,
+                    self._time_scale_factor, self._machine_time_step,
+                    pacman_provenance, router_provenance, self._machine_graph,
+                    self._current_run_timesteps, self._buffer_manager,
+                    self._mapping_time, self._load_time, self._execute_time,
+                    self._dsg_time, self._extraction_time)
+
         # shut down the machine properly
         self._shutdown(
             turn_off_machine, clear_routing_tables, clear_tags)
@@ -2054,7 +2284,7 @@ class SpinnakerMainInterface(object):
             self._app_data_top_simulation_folder,
             self._report_simulation_top_directory)
 
-    def _add_socket_address(self, socket_address):
+    def add_socket_address(self, socket_address):
         """
 
         :param socket_address:
@@ -2090,8 +2320,7 @@ class SpinnakerMainInterface(object):
 
     @property
     def config(self):
-        """ helper method for the  front end impls till we remove config
-
-        :return:
+        """ helper method for the front end implementations until we remove\
+            config
         """
         return self._config
