@@ -124,6 +124,8 @@ class ChipPowerMonitorMachineVertex(
         maximum_sdram_for_buffering = [max_buffer_size]
 
         # figure recording size for max run
+        if n_machine_time_steps is None:
+            n_machine_time_steps = 1.
         n_recording_entries = math.ceil(
             (sampling_frequency /
              (n_machine_time_steps * time_step * time_scale_factor)) /

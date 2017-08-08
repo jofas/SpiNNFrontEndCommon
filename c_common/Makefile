@@ -1,5 +1,5 @@
 INSTALL_DIRS = front_end_common_lib
-BUILD_DIRS = models
+BUILD_DIRS = models connection_builder delay_extension_receiver
 
 all: install build
 	

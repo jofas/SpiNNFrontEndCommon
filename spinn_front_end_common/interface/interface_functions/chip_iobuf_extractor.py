@@ -50,6 +50,8 @@ class ChipIOBufExtractor(object):
 
             # write iobuf to file.
             with open(file_name, mode) as writer:
+                if mode == "a":
+                    writer.write("\n\n")
                 writer.write(iobuf.iobuf)
 
         # check iobuf for errors

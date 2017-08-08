@@ -16,7 +16,8 @@ class LoadExecutableImages(object):
     __slots__ = []
 
     def __call__(self, executable_targets, app_id, transceiver,
-                 loaded_application_data_token):
+                 loaded_application_data_token,
+                 generated_connectors_on_machine_token):
         """ Go through the executable targets and load each binary to \
             everywhere and then send a start request to the cores that \
             actually use it
@@ -25,6 +26,12 @@ class LoadExecutableImages(object):
         if not loaded_application_data_token:
             raise ConfigurationException(
                 "The token for having loaded the application data token is set"
+                " to false and therefore I cannot run. Please fix and try "
+                "again")
+
+        if not generated_connectors_on_machine_token:
+            raise exceptions.ConfigurationException(
+                "The token for generating connectors on machine token is set"
                 " to false and therefore I cannot run. Please fix and try "
                 "again")
 

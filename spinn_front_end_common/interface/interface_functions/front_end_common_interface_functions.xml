@@ -384,12 +384,17 @@
                 <param_name>loaded_application_data_token</param_name>
                 <param_type>LoadedApplicationDataToken</param_type>
             </parameter>
+            <parameter>
+                <param_name>generated_connectors_on_machine_token</param_name>
+                <param_type>GeneratedConnectorsOnMachineToken</param_type>
+            </parameter>
         </input_definitions>
         <required_inputs>
             <param_name>executable_targets</param_name>
             <param_name>app_id</param_name>
             <param_name>transceiver</param_name>
             <param_name>loaded_application_data_token</param_name>
+            <param_name>generated_connectors_on_machine_token</param_name>
         </required_inputs>
         <outputs>
             <param_type>LoadBinariesToken</param_type>

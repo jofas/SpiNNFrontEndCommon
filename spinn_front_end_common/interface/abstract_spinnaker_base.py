@@ -1581,6 +1581,9 @@ class AbstractSpinnakerBase(SimulatorInterface):
         if self._has_ran and not self._use_virtual_board:
             optional_algorithms.append("DSGRegionReloader")
 
+        ##### change ! #####
+        optional_algorithms.append("ConnectionBuilder")
+
         # Get the executable targets
         optional_algorithms.append("GraphBinaryGatherer")
 

@@ -3,6 +3,7 @@ import os
 from spinn_front_end_common.interface import interface_functions
 from spinn_front_end_common.utilities import report_functions
 from spinn_front_end_common import mapping_algorithms
+from spinn_front_end_common import connection_builder
 
 
 def get_front_end_common_pacman_xml_paths():
@@ -17,6 +18,9 @@ def get_front_end_common_pacman_xml_paths():
             "front_end_common_reports.xml"),
         os.path.join(
             os.path.dirname(mapping_algorithms.__file__),
-            "front_end_common_mapping_algorithms.xml"
+            "front_end_common_mapping_algorithms.xml"),
+        os.path.join(
+            os.path.dirname(connection_builder.__file__),
+            "connection_builder.xml"
         )
     ]
