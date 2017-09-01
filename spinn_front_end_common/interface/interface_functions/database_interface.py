@@ -46,34 +46,51 @@ class DatabaseInterface(object):
             else:
                 database_progress = ProgressBar(10, "Creating database")
 
+            print("\nadd_system_params")
             self._writer.add_system_params(
                 time_scale_factor, machine_time_step, runtime)
             database_progress.update()
+
+            print("\nadd_machine_objects")
             self._writer.add_machine_objects(machine)
             database_progress.update()
+
             if application_graph is not None and application_graph.n_vertices:
+                print("\nadd_application_vertices")
                 self._writer.add_application_vertices(application_graph)
                 database_progress.update()
+
+            print("\nadd_vertices")
             self._writer.add_vertices(
                 machine_graph, graph_mapper, application_graph)
             database_progress.update()
+
+            print("\nadd_placements")
             self._writer.add_placements(placements, machine_graph)
             database_progress.update()
+
+            print("\nadd_routing_infos")
             self._writer.add_routing_infos(
                 routing_infos, machine_graph)
             database_progress.update()
+
+            print("\nadd_routing_tables")
             self._writer.add_routing_tables(router_tables)
             database_progress.update()
+
+            print("\nadd_tags")
             self._writer.add_tags(machine_graph, tags)
             database_progress.update()
             if (graph_mapper is not None and
                     application_graph is not None and
                     create_atom_to_event_id_mapping):
+                print("\ncreate_atom_to_event_id_mapping")
                 self._writer.create_atom_to_event_id_mapping(
                     graph_mapper=graph_mapper,
                     application_graph=application_graph,
                     machine_graph=machine_graph,
                     routing_infos=routing_infos)
+
             database_progress.update()
             database_progress.update()
             database_progress.end()

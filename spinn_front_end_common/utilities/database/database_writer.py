@@ -11,6 +11,12 @@ import os
 import sys
 
 logger = logging.getLogger(__name__)
+JOURNAL_MODE = "WAL"
+PAGE_SIZE = 5120
+CACHE_SIZE = 5000
+SYNC_DB = 'OFF'
+TEMP_STORE = "MEMORY"
+
 
 
 class DatabaseWriter(object):
@@ -48,6 +54,14 @@ class DatabaseWriter(object):
         # set up checks
         self._machine_id = 0
 
+    def set_pragmas(self, cur):
+        cur.execute("PRAGMA journal_mode = %s" % JOURNAL_MODE)
+        cur.execute("PRAGMA page_size = %d" % PAGE_SIZE)
+        cur.execute("PRAGMA cache_size = %d" % CACHE_SIZE)
+        cur.execute("PRAGMA synchronous = %s" % SYNC_DB)
+        cur.execute("PRAGMA temp_store = %s" % TEMP_STORE)
+
+
     @staticmethod
     def auto_detect_database(machine_graph):
         """ Auto detects if there is a need to activate the database system
@@ -79,6 +93,8 @@ class DatabaseWriter(object):
             import sqlite3 as sqlite
             connection = sqlite.connect(self._database_path)
             cur = connection.cursor()
+            self.set_pragmas(cur)
+
             cur.execute(
                 "CREATE TABLE Machine_layout("
                 "machine_id INTEGER PRIMARY KEY AUTOINCREMENT,"
@@ -137,6 +153,8 @@ class DatabaseWriter(object):
             import sqlite3 as sqlite
             connection = sqlite.connect(self._database_path)
             cur = connection.cursor()
+            self.set_pragmas(cur)
+
             cur.execute(
                 "CREATE TABLE Application_vertices("
                 "vertex_id INTEGER PRIMARY KEY AUTOINCREMENT, "
@@ -227,6 +245,8 @@ class DatabaseWriter(object):
             import sqlite3 as sqlite
             connection = sqlite.connect(self._database_path)
             cur = connection.cursor()
+            self.set_pragmas(cur)
+
             # create table
             cur.execute(
                 "CREATE TABLE configuration_parameters("
@@ -283,6 +303,8 @@ class DatabaseWriter(object):
             import sqlite3 as sqlite
             connection = sqlite.connect(self._database_path)
             cur = connection.cursor()
+            self.set_pragmas(cur)
+
             cur.execute(
                 "CREATE TABLE Machine_vertices("
                 "vertex_id INTEGER PRIMARY KEY AUTOINCREMENT, label TEXT, "
@@ -305,6 +327,7 @@ class DatabaseWriter(object):
                 " REFERENCES Machine_edges(edge_id))")
 
             # add machine vertex
+
             for vertex in machine_graph.vertices:
                 cur.execute(
                     "INSERT INTO Machine_vertices ("
@@ -375,6 +398,7 @@ class DatabaseWriter(object):
                                 machine_vertices.index(machine_vertex) + 1,
                                 vertex_slice.lo_atom, vertex_slice.hi_atom))
 
+
                 # add graph_mapper edges
                 app_edges = list(application_graph.edges)
                 for edge in machine_edges:
@@ -404,6 +428,7 @@ class DatabaseWriter(object):
             import sqlite3 as sqlite
             connection = sqlite.connect(self._database_path)
             cur = connection.cursor()
+            self.set_pragmas(cur)
 
             # create tables
             cur.execute(
@@ -444,6 +469,8 @@ class DatabaseWriter(object):
             import sqlite3 as sqlite
             connection = sqlite.connect(self._database_path)
             cur = connection.cursor()
+            self.set_pragmas(cur)
+
             cur.execute(
                 "CREATE TABLE Routing_info("
                 "edge_id INTEGER, key INT, mask INT, "
@@ -451,7 +478,6 @@ class DatabaseWriter(object):
                 "FOREIGN KEY (edge_id) REFERENCES Machine_edges(edge_id))")
 
             all_edges = list(machine_graph.edges)
-
             for partition in machine_graph.outgoing_edge_partitions:
                 rinfo = routing_infos.get_routing_info_from_partition(
                     partition)
@@ -463,6 +489,7 @@ class DatabaseWriter(object):
                             "VALUES({}, {}, {})"
                             .format(all_edges.index(edge) + 1,
                                     key_mask.key, key_mask.mask))
+
             connection.commit()
             connection.close()
         except Exception:
@@ -480,6 +507,7 @@ class DatabaseWriter(object):
             import sqlite3 as sqlite
             connection = sqlite.connect(self._database_path)
             cur = connection.cursor()
+            self.set_pragmas(cur)
 
             cur.execute(
                 "CREATE TABLE Routing_table("
@@ -521,6 +549,8 @@ class DatabaseWriter(object):
             import sqlite3 as sqlite
             connection = sqlite.connect(self._database_path)
             cur = connection.cursor()
+            self.set_pragmas(cur)
+
             cur.execute(
                 "CREATE TABLE IP_tags("
                 "vertex_id INTEGER, tag INTEGER, "
@@ -583,6 +613,7 @@ class DatabaseWriter(object):
             import sqlite3 as sqlite
             connection = sqlite.connect(self._database_path)
             cur = connection.cursor()
+            self.set_pragmas(cur)
 
             # create table
             cur.execute(

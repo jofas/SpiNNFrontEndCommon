@@ -48,6 +48,7 @@ class DatabaseReader(object):
             event_id_to_atom_id_mapping[row["event"]] = row["a_id"]
         return event_id_to_atom_id_mapping
 
+
     def get_atom_id_to_key_mapping(self, label):
         """ Get a mapping of atom id to event key for a given vertex
 
@@ -63,6 +64,7 @@ class DatabaseReader(object):
                 " WHERE p.vertex_label=\"{}\"".format(label)):
             atom_to_event_id_mapping[row["a_id"]] = row["event"]
         return atom_to_event_id_mapping
+
 
     def get_live_output_details(self, label, receiver_label):
         """ Get the ip address, port and whether the SDP headers are to be\
