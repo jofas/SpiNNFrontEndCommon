@@ -443,8 +443,8 @@ bool ReadConnectionBuilderRegion(uint32_t **in_region,
     return NULL;
   }
 #ifdef DEBUG_MESSAGES
-  LOG_PRINT(LOG_LEVEL_INFO, "max num static: %u, max num plastic: %u",
-            num_static, num_plastic);
+  LOG_PRINT(LOG_LEVEL_INFO, "max num static: %u, max num plastic: %u, row_len: %u",
+            num_static, num_plastic, row_len);
 #endif
 
   if(matrixGenerator->is_static){
@@ -455,7 +455,7 @@ bool ReadConnectionBuilderRegion(uint32_t **in_region,
       //diff means 2*(max plastic words)? and we can have 2 plastic control/weights
       //per word, so to get max num plastic = 2(row_len - stateWords)/2
       //which means we shouldn't do a thing!
-      num_plastic = (row_len - matrixGenerator->m_PreStateWords);
+      num_plastic = (row_len - matrixGenerator->m_PreStateWords)/2;
     }else{
       num_plastic = 0;
     }

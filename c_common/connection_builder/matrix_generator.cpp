@@ -10,7 +10,7 @@
 #include "connector_generator.h"
 #include "param_generator.h"
 
-// #define DEBUG_MESSAGES
+//#define DEBUG_MESSAGES
 
 #define _pack_id_delay(i, d) ((i & 0xFF) | ((d & 0xFF) << 8))
 
@@ -305,8 +305,8 @@ unsigned int ConnectionBuilder::MatrixGenerator::Plastic::WriteRow(uint32_t *syn
   const uint16_t (&indices)[512], const int32_t (&delays)[512], const int32_t (&weights)[512]) const {
 
   uint16_t fixed_mask = ((1 << (syn_type_bits + SYNAPSE_INDEX_BITS)) - 1);
-//  LOG_PRINT(LOG_LEVEL_INFO, "Plastic Writer");
-//  LOG_PRINT(LOG_LEVEL_INFO, "Write Plastic Words =O");
+  LOG_PRINT(LOG_LEVEL_INFO, "Plastic Writer");
+
   uint16_t inserted_indices = 0;
 //  uint32_t plastic_step = m_PreStateWords + numIndices;
   uint32_t preIndex = pre_idx;
@@ -357,7 +357,6 @@ unsigned int ConnectionBuilder::MatrixGenerator::Plastic::WriteRow(uint32_t *syn
 
 //    LOG_PRINT(LOG_LEVEL_INFO, "Start of Plastic = 0x%08x", start_of_plastic);
 //    LOG_PRINT(LOG_LEVEL_INFO, "Start of Fixed = 0x%08x", start_of_fixed);
-//    LOG_PRINT(LOG_LEVEL_INFO, "Num of post indices = %u", max_indices);
 //    LOG_PRINT(LOG_LEVEL_INFO, "Max per Pre Matrix Size = %u", max_per_pre_matrix_size);
 
 
@@ -385,9 +384,8 @@ unsigned int ConnectionBuilder::MatrixGenerator::Plastic::WriteRow(uint32_t *syn
 
     }
     start_of_fixed += 2;
-//    LOG_PRINT(LOG_LEVEL_INFO, "befor if numIndices");
+//    LOG_PRINT(LOG_LEVEL_INFO, "before if numIndices");
     if(numIndices > 0){
-      if(weight == 0){ continue; }
 //      LOG_PRINT(LOG_LEVEL_INFO, "before insert sorted");
       insert_sorted(fixed, start_of_fixed, fixed_mask, max_num_plastic, weight,
                     start_of_plastic, true, inserted_empty);
