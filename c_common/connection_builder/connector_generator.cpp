@@ -293,7 +293,7 @@ unsigned int ConnectionBuilder::ConnectorGenerator::OneToOne::Generate(
      if(dice_roll <= m_Probability)
      {
 
-       if (!m_AllowSelfConnections && post == pre_idx ){
+       if (!m_AllowSelfConnections && (post+post_start) == pre_idx ){
          continue;
        }
        indices[num_conns++] = post;
