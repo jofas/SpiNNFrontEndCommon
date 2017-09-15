@@ -336,6 +336,7 @@ unsigned int ConnectionBuilder::MatrixGenerator::Plastic::WriteRow(uint32_t *syn
     }
 
     weight = ClampWeight(weight);
+    weight = weight << 16; // we looove wasting space!!!
 
     // Clamp delays and weights pointed to be sorted index
     int32_t delay = ClampDelay(delays[data_index]);
@@ -349,12 +350,11 @@ unsigned int ConnectionBuilder::MatrixGenerator::Plastic::WriteRow(uint32_t *syn
 
     uint32_t *start_of_matrix = synapse_mtx + preIndex*max_per_pre_matrix_size;
 
-    *start_of_matrix = m_PreStateWords + min_ind_words;
+    *start_of_matrix = m_PreStateWords + min_indices;
 
     uint16_t *start_of_fixed = (uint16_t *)(start_of_matrix + m_PreStateWords +
-                                            min_ind_words + max_num_static + 2);
-    uint16_t *start_of_plastic = (uint16_t *)(start_of_matrix + m_PreStateWords+1);
-    start_of_plastic++;
+                                            min_indices + max_num_static + 2);
+    uint32_t *start_of_plastic = start_of_matrix + m_PreStateWords+1;
 
 #ifdef DEBUG_MESSAGES
     LOG_PRINT(LOG_LEVEL_INFO, "Start of syn_mtx = 0x%08x", synapse_mtx);

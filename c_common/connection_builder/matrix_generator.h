@@ -100,7 +100,7 @@ protected:
 
   template <typename T>
   void insert_sorted(T new_fixed, T *fixed_address, T val_mask, uint32_t max_rows,
-                     uint16_t new_plastic=0, uint16_t *plastic_address=NULL,
+                     uint32_t new_plastic=0, uint32_t *plastic_address=NULL,
                      bool is_plastic=false, bool skip_first=false) const{
 
       if (*fixed_address == EMPTY_VAL && !skip_first){

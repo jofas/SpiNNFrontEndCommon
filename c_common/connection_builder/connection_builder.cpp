@@ -18,7 +18,7 @@
 #include "param_generator.h"
 
 
-#define DEBUG_MESSAGES
+//#define DEBUG_MESSAGES
 #define SARK_HEAP 1
 
 // Namespaces
@@ -320,7 +320,7 @@ uint32_t max_matrix_size(uint32_t max_n_static, uint32_t max_n_plastic,
 //  LOG_PRINT(LOG_LEVEL_INFO, "header: %u, static: %u, plastic: %u ; %u, def: 3",
 //            plastic_header, max_n_static, max_n_plastic, plastic_word_size);
 
-  return 1 + plastic_header + plastic_word_size +
+  return 1 + plastic_header + max_n_plastic +
          1 + 1 + max_n_static + plastic_word_size;
   //n_plastic was already multiplied before
 //  return 1 + plastic_word_size + 1 + 1 + n_static + n_plastic;
@@ -369,6 +369,7 @@ bool ReadConnectionBuilderRegion(uint32_t **in_region,
   const uint32_t address_delta       = *region++;
   const uint32_t row_len             = *region++;
   const uint32_t num_pre_neurons     = *region++;
+  const uint32_t max_post_neurons    = *region++;
   const uint32_t pre_slice_start     = *region++;
   const uint32_t pre_slice_count     = *region++;
   const uint32_t is_direct_row       = *region++;
@@ -455,7 +456,9 @@ bool ReadConnectionBuilderRegion(uint32_t **in_region,
       //diff means 2*(max plastic words)? and we can have 2 plastic control/weights
       //per word, so to get max num plastic = 2(row_len - stateWords)/2
       //which means we shouldn't do a thing!
-      num_plastic = (row_len - matrixGenerator->m_PreStateWords)/2;
+//      num_plastic = (row_len - matrixGenerator->m_PreStateWords);
+//      num_plastic = (num_plastic/2 + num_plastic%2);
+      num_plastic = max_post_neurons;
     }else{
       num_plastic = 0;
     }
