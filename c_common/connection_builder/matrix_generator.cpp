@@ -11,6 +11,7 @@
 #include "param_generator.h"
 
 //#define DEBUG_MESSAGES
+#define MAX_DELAY 16
 
 #define _pack_id_delay(i, d) ((i & 0xFF) | ((d & 0xFF) << 8))
 
@@ -29,7 +30,6 @@ inline uint32_t to_shifted_fix88(uint32_t fix1616, uint32_t shift){
   return fix88;
 }
 
-#define MAX_DELAY 16
 
 //-----------------------------------------------------------------------------
 // ConnectionBuilder::MatrixGenerator::Base
@@ -306,6 +306,7 @@ unsigned int ConnectionBuilder::MatrixGenerator::Plastic::WriteRow(uint32_t *syn
 
   uint16_t fixed_mask = ((1 << (syn_type_bits + SYNAPSE_INDEX_BITS)) - 1);
   LOG_PRINT(LOG_LEVEL_INFO, "Plastic Writer");
+  LOG_PRINT(LOG_LEVEL_INFO, "synapse type bits %u", syn_type_bits);
 
   uint16_t inserted_indices = 0;
 //  uint32_t plastic_step = m_PreStateWords + numIndices;
@@ -352,12 +353,14 @@ unsigned int ConnectionBuilder::MatrixGenerator::Plastic::WriteRow(uint32_t *syn
 
     uint16_t *start_of_fixed = (uint16_t *)(start_of_matrix + m_PreStateWords +
                                             min_ind_words + max_num_static + 2);
-    uint16_t *start_of_plastic = (uint16_t *)(start_of_matrix + m_PreStateWords + 1);
-//    start_of_plastic++;
+    uint16_t *start_of_plastic = (uint16_t *)(start_of_matrix + m_PreStateWords+1);
+    start_of_plastic++;
 
-//    LOG_PRINT(LOG_LEVEL_INFO, "Start of Plastic = 0x%08x", start_of_plastic);
-//    LOG_PRINT(LOG_LEVEL_INFO, "Start of Fixed = 0x%08x", start_of_fixed);
-//    LOG_PRINT(LOG_LEVEL_INFO, "Max per Pre Matrix Size = %u", max_per_pre_matrix_size);
+    LOG_PRINT(LOG_LEVEL_INFO, "Start of syn_mtx = 0x%08x", synapse_mtx);
+    LOG_PRINT(LOG_LEVEL_INFO, "Start of Matrix = 0x%08x", start_of_matrix);
+    LOG_PRINT(LOG_LEVEL_INFO, "Start of Plastic = 0x%08x", start_of_plastic);
+    LOG_PRINT(LOG_LEVEL_INFO, "Start of Fixed = 0x%08x", start_of_fixed);
+    LOG_PRINT(LOG_LEVEL_INFO, "Max per Pre Matrix Size = %u", max_per_pre_matrix_size);
 
 
 

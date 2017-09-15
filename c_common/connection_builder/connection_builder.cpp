@@ -670,8 +670,8 @@ bool ReadSDRAMData(uint32_t *params_address, uint32_t *syn_mtx_addr){
 #ifdef DEBUG_MESSAGES
 //        LOG_PRINT(LOG_LEVEL_INFO, "AFTER: params and syn addr 0x%08x\t0x%08x",
 //                  params_address, syn_mtx_addr);
-        LOG_PRINT(LOG_LEVEL_INFO, "synaptic matrix size = %u",
-                  syn_mtx_addr[0] >> 2);
+//        LOG_PRINT(LOG_LEVEL_INFO, "synaptic matrix size = %u",
+//                  syn_mtx_addr[0] >> 2);
 //        for(uint32_t i = 0; i < (syn_mtx_addr[0] >> 2)+2; i++){
 //          LOG_PRINT(LOG_LEVEL_INFO, "syn_mtx_addr[%u] = %u", i, syn_mtx_addr[i]);
 //        }
