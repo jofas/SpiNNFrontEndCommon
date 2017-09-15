@@ -356,12 +356,13 @@ unsigned int ConnectionBuilder::MatrixGenerator::Plastic::WriteRow(uint32_t *syn
     uint16_t *start_of_plastic = (uint16_t *)(start_of_matrix + m_PreStateWords+1);
     start_of_plastic++;
 
+#ifdef DEBUG_MESSAGES
     LOG_PRINT(LOG_LEVEL_INFO, "Start of syn_mtx = 0x%08x", synapse_mtx);
     LOG_PRINT(LOG_LEVEL_INFO, "Start of Matrix = 0x%08x", start_of_matrix);
     LOG_PRINT(LOG_LEVEL_INFO, "Start of Plastic = 0x%08x", start_of_plastic);
     LOG_PRINT(LOG_LEVEL_INFO, "Start of Fixed = 0x%08x", start_of_fixed);
     LOG_PRINT(LOG_LEVEL_INFO, "Max per Pre Matrix Size = %u", max_per_pre_matrix_size);
-
+#endif
 
 
     const uint16_t fixed = BuildFixedPlasticWord(0, // axonal delay <- not implemented
