@@ -305,8 +305,10 @@ unsigned int ConnectionBuilder::MatrixGenerator::Plastic::WriteRow(uint32_t *syn
   const uint16_t (&indices)[512], const int32_t (&delays)[512], const int32_t (&weights)[512]) const {
 
   uint16_t fixed_mask = ((1 << (syn_type_bits + SYNAPSE_INDEX_BITS)) - 1);
+#ifdef DEBUG_MESSAGES
   LOG_PRINT(LOG_LEVEL_INFO, "Plastic Writer");
   LOG_PRINT(LOG_LEVEL_INFO, "synapse type bits %u", syn_type_bits);
+#endif
 
   uint16_t inserted_indices = 0;
 //  uint32_t plastic_step = m_PreStateWords + numIndices;
