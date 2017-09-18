@@ -48,7 +48,7 @@ bool ConnectionBuilder::MatrixGenerator::Base::Generate(
   uint32_t pre_key,    uint32_t pre_mask,
   uint32_t pre_start,  uint32_t pre_count,
   uint32_t pre_block_start,  uint32_t pre_block_count,
-  uint32_t num_pre_neurons,
+  uint32_t num_pre_neurons, uint32_t words_per_weight,
   int32_t *scales,  uint32_t syn_type_bits,
   ConnectorGenerator::Base *connectorGenerator,
   const ParamGenerator::Base *delayGenerator,
@@ -126,7 +126,7 @@ bool ConnectionBuilder::MatrixGenerator::Base::Generate(
 //                               num_pre_neurons,
                                pre_count,
                                pre_idx-pre_start, max_per_pre_matrix_size,
-                               numIndices, 0, syn_type_bits,
+                               numIndices, 0, syn_type_bits, words_per_weight,
 //                               numIndices, scales[synapse_type], syn_type_bits,
                                max_num_plastic, max_num_static, synapse_type,
                                indices, delays, weights);
@@ -187,7 +187,8 @@ ConnectionBuilder::MatrixGenerator::Static::Static(uint32_t *&region) : Base(reg
 //-----------------------------------------------------------------------------
 unsigned int ConnectionBuilder::MatrixGenerator::Static::WriteRow(uint32_t *synapse_mtx,
   uint32_t num_pre_neurons, uint32_t pre_idx, const uint32_t max_per_pre_matrix_size,
-  const uint32_t numIndices, const int32_t weight_shift,  uint32_t syn_type_bits,
+  const uint32_t numIndices, const int32_t weight_shift,
+  uint32_t syn_type_bits, uint32_t words_per_weight,
   const uint32_t max_num_plastic, const uint32_t max_num_static, uint32_t synapseType,
   const uint16_t (&indices)[512], const int32_t (&delays)[512], const int32_t (&weights)[512]) const {
 //  LOG_PRINT(LOG_LEVEL_INFO, "Static Writer");
@@ -259,7 +260,8 @@ unsigned int ConnectionBuilder::MatrixGenerator::Static::WriteRow(uint32_t *syna
     //0 <- plastic-plastic word
     //NULL <- start of plastic-plastic region,
     //false <- not a plastic synapse
-    insert_sorted(word, start_of_static, fixed_mask, max_num_static, 0, NULL, false, false);
+    insert_sorted(word, start_of_static, fixed_mask, max_num_static,
+                  0, NULL, 1, false, false);
     first_pass = 0;
     inserted_indices++;
     if(inserted_indices == max_num_static){
@@ -300,7 +302,8 @@ ConnectionBuilder::MatrixGenerator::Plastic::Plastic(uint32_t *&region) : Base(r
 //-----------------------------------------------------------------------------
 unsigned int ConnectionBuilder::MatrixGenerator::Plastic::WriteRow(uint32_t *synapse_mtx,
   uint32_t num_pre_neurons, uint32_t pre_idx, const uint32_t max_per_pre_matrix_size,
-  const uint32_t numIndices, const int32_t weight_shift,  uint32_t syn_type_bits,
+  const uint32_t numIndices, const int32_t weight_shift,
+  uint32_t syn_type_bits, uint32_t words_per_weight,
   const uint32_t max_num_plastic, const uint32_t max_num_static, uint32_t synapseType,
   const uint16_t (&indices)[512], const int32_t (&delays)[512], const int32_t (&weights)[512]) const {
 
@@ -394,7 +397,7 @@ unsigned int ConnectionBuilder::MatrixGenerator::Plastic::WriteRow(uint32_t *syn
     if(numIndices > 0){
 //      LOG_PRINT(LOG_LEVEL_INFO, "before insert sorted");
       insert_sorted(fixed, start_of_fixed, fixed_mask, max_num_plastic, weight,
-                    start_of_plastic, true, inserted_empty);
+                    start_of_plastic, true, words_per_weight, inserted_empty);
 //      LOG_PRINT(LOG_LEVEL_INFO, "after insert sorted");
 
       if(fixed == EMPTY_VAL){

@@ -370,6 +370,7 @@ bool ReadConnectionBuilderRegion(uint32_t **in_region,
   const uint32_t row_len             = *region++;
   const uint32_t num_pre_neurons     = *region++;
   const uint32_t max_post_neurons    = *region++;
+  const uint32_t words_per_weight    = *region++;
   const uint32_t pre_slice_start     = *region++;
   const uint32_t pre_slice_count     = *region++;
   const uint32_t is_direct_row       = *region++;
@@ -423,8 +424,9 @@ bool ReadConnectionBuilderRegion(uint32_t **in_region,
 #endif
 
   // Generate matrix, connector, delays and weights
-  const auto matrixGenerator = g_MatrixGeneratorFactory.Create(matrix_type_hash, 
-                                               region, g_MatrixGeneratorBuffer);
+  const auto matrixGenerator = g_MatrixGeneratorFactory.Create(
+                                   matrix_type_hash, region,
+                                   g_MatrixGeneratorBuffer);
 
   const auto connectorGenerator = g_ConnectorGeneratorFactory.Create(connector_type_hash, 
                                                      region, g_ConnectorGeneratorBuffer);
@@ -511,7 +513,7 @@ bool ReadConnectionBuilderRegion(uint32_t **in_region,
                                   pre_key, pre_mask,
                                   pre_slice_start, pre_slice_count,
                                   pre_start_new, pre_count_new,
-                                  num_pre_neurons,
+                                  num_pre_neurons, words_per_weight,
                                   weight_scales, num_synapse_bits,
                                   connectorGenerator, delayGenerator, weightGenerator,
                                   rng, pre_delay_pairs, pair_count)){
@@ -670,15 +672,15 @@ bool ReadSDRAMData(uint32_t *params_address, uint32_t *syn_mtx_addr){
                     edge);
           return false;
         }
-#ifdef DEBUG_MESSAGES
+//#ifdef DEBUG_MESSAGES
 //        LOG_PRINT(LOG_LEVEL_INFO, "AFTER: params and syn addr 0x%08x\t0x%08x",
 //                  params_address, syn_mtx_addr);
-//        LOG_PRINT(LOG_LEVEL_INFO, "synaptic matrix size = %u",
-//                  syn_mtx_addr[0] >> 2);
-//        for(uint32_t i = 0; i < (syn_mtx_addr[0] >> 2)+2; i++){
-//          LOG_PRINT(LOG_LEVEL_INFO, "syn_mtx_addr[%u] = %u", i, syn_mtx_addr[i]);
-//        }
-#endif
+        LOG_PRINT(LOG_LEVEL_INFO, "synaptic matrix size = %u",
+                  syn_mtx_addr[0] >> 2);
+        for(uint32_t i = 0; i < (syn_mtx_addr[0] >> 2)+2; i++){
+          LOG_PRINT(LOG_LEVEL_INFO, "syn_mtx_addr[%u] = %u", i, syn_mtx_addr[i]);
+        }
+//#endif
       }
     }
   }
