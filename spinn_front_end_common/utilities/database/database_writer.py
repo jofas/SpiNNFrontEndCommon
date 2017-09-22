@@ -327,7 +327,6 @@ class DatabaseWriter(object):
                 " REFERENCES Machine_edges(edge_id))")
 
             # add machine vertex
-
             for vertex in machine_graph.vertices:
                 cur.execute(
                     "INSERT INTO Machine_vertices ("
@@ -478,6 +477,7 @@ class DatabaseWriter(object):
                 "FOREIGN KEY (edge_id) REFERENCES Machine_edges(edge_id))")
 
             all_edges = list(machine_graph.edges)
+            total_out = len(machine_graph.outgoing_edge_partitions)
             for partition in machine_graph.outgoing_edge_partitions:
                 rinfo = routing_infos.get_routing_info_from_partition(
                     partition)

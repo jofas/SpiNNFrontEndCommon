@@ -62,6 +62,7 @@ bool ConnectionBuilder::MatrixGenerator::Base::Generate(
               pre_block_start, pre_block_start+pre_block_count-1,
               post_start, post_start+post_count-1);
 #endif
+//    LOG_PRINT(LOG_LEVEL_INFO, "words per weight %d", words_per_weight);
 
     uint32_t max_indices = max_num_plastic + max_num_static;
     pair_count = 0;
@@ -199,6 +200,7 @@ unsigned int ConnectionBuilder::MatrixGenerator::Static::WriteRow(uint32_t *syna
   uint8_t first_pass = 1;
   uint32_t preIndex = pre_idx;
 
+
   for(uint16_t data_index = 0; data_index < numIndices; data_index++){
     // Extract index pointed to by sorted index
     const uint32_t postIndex = indices[data_index];
@@ -331,7 +333,7 @@ unsigned int ConnectionBuilder::MatrixGenerator::Plastic::WriteRow(uint32_t *syn
     const uint32_t postIndex = indices[data_index];
 
     // EXC == 0, INH == 1
-    int32_t weight = weights[data_index];
+    int16_t weight = weights[data_index];
     if (IsSignedWeight() && weight < 0 &&
         (synapseType == 0 || synapseType == 1)){
       synapseType = 1;
@@ -341,7 +343,6 @@ unsigned int ConnectionBuilder::MatrixGenerator::Plastic::WriteRow(uint32_t *syn
     }
 
     weight = ClampWeight(weight);
-    weight = weight << 16; // we looove wasting space!!!
 
     // Clamp delays and weights pointed to be sorted index
     int32_t delay = ClampDelay(delays[data_index]);
@@ -359,7 +360,7 @@ unsigned int ConnectionBuilder::MatrixGenerator::Plastic::WriteRow(uint32_t *syn
 
     uint16_t *start_of_fixed = (uint16_t *)(start_of_matrix + m_PreStateWords +
                                             min_indices + max_num_static + 2);
-    uint32_t *start_of_plastic = start_of_matrix + m_PreStateWords+1;
+    uint16_t *start_of_plastic = (uint16_t *)(start_of_matrix + m_PreStateWords + 1);
 
 #ifdef DEBUG_MESSAGES
     LOG_PRINT(LOG_LEVEL_INFO, "Start of syn_mtx = 0x%08x", synapse_mtx);
@@ -397,7 +398,7 @@ unsigned int ConnectionBuilder::MatrixGenerator::Plastic::WriteRow(uint32_t *syn
     if(numIndices > 0){
 //      LOG_PRINT(LOG_LEVEL_INFO, "before insert sorted");
       insert_sorted(fixed, start_of_fixed, fixed_mask, max_num_plastic, weight,
-                    start_of_plastic, true, words_per_weight, inserted_empty);
+                    start_of_plastic, words_per_weight, true, inserted_empty);
 //      LOG_PRINT(LOG_LEVEL_INFO, "after insert sorted");
 
       if(fixed == EMPTY_VAL){

@@ -170,7 +170,7 @@ OBJECTS += $(RIG_CPP_COMMON_SOURCES:%.cpp=$(BUILDDIR)/rig_cpp_common/%.o)
 # Set standard libraries and C flags
 LIBRARIES = -lspin1_api
 CFLAGS += -Wall -Wextra -Ofast -fno-rtti -fno-exceptions -I $(RIG_CPP_COMMON_RUNTIME)
-LFLAGS += -nodefaultlibs
+LFLAGS += -nodefaultlibs -ffreestanding
 
 # If it is not set already, use standard app directory
 APP_DIR := ../../../spinn_front_end_common/connection_builder/connection_builder_app/

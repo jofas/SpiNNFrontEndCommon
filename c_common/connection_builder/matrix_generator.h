@@ -101,14 +101,14 @@ protected:
 
   template <typename T>
   void insert_sorted(T new_fixed, T *fixed_address, T val_mask, uint32_t max_rows,
-                     uint32_t new_plastic=0, uint32_t *plastic_address=NULL,
+                     uint16_t new_plastic=0, uint16_t *plastic_address=NULL,
                      uint32_t plastic_step=1,
                      bool is_plastic=false, bool skip_first=false) const{
 
       if (*fixed_address == EMPTY_VAL && !skip_first){
         *fixed_address = new_fixed;
 
-        if(is_plastic){ *plastic_address = new_plastic; }
+        if(is_plastic){ plastic_address[plastic_step-1] = new_plastic; }
         return;
       }
       for(uint32_t i = 1; i < max_rows; i++){
@@ -118,7 +118,9 @@ protected:
 
             fixed_address[i] = new_fixed;
 
-            if(is_plastic){ plastic_address[plastic_step*i] = new_plastic; }
+            if(is_plastic){
+              plastic_address[plastic_step*(i+1) - 1] = new_plastic;
+            }
 //            LOG_PRINT(LOG_LEVEL_INFO, "\tinserted in %u", i);
             return;
         }
@@ -130,8 +132,9 @@ protected:
           fixed_address[i - 1] = new_fixed;
 
           if(is_plastic){
-            plastic_address[plastic_step*i] = plastic_address[plastic_step*(i - 1)];
-            plastic_address[plastic_step*(i - 1)] = new_plastic;
+            plastic_address[plastic_step*(i+1) - 1] = \
+                                plastic_address[plastic_step*i - 1];
+            plastic_address[plastic_step*i - 1] = new_plastic;
           }
 //          LOG_PRINT(LOG_LEVEL_INFO, "\tinserted in %u", i);
           return;
@@ -140,7 +143,9 @@ protected:
                  (new_fixed & val_mask)){
 
           swap(fixed_address[i-1], new_fixed);
-          if(is_plastic){ swap(plastic_address[plastic_step*(i - 1)], new_plastic); }
+          if(is_plastic){
+            swap(plastic_address[plastic_step*(i - 1)], new_plastic);
+          }
         }
       }
 

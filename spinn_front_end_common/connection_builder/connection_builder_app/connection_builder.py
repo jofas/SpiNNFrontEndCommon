@@ -30,7 +30,7 @@ DLY_SDRAM_TAG = 160  # whaaat!?!?!? should this be defined in another file???
 
 MAX_32 = numpy.uint32(0xFFFFFFFF)
 
-FORCE_EXTRACT = True if 1 else False
+FORCE_EXTRACT = True if 0 else False
 
 class ConnectionBuilder(object):
     """ Compressor that uses a on chip router compressor
