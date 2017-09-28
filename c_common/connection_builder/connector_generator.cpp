@@ -56,14 +56,16 @@ ConnectionBuilder::ConnectorGenerator::Mapping::Mapping(uint32_t *&region){
     region++;
 
     m_channel     = (uint8_t)( (*region) & 0xFF );
-    m_channelBits = (uint8_t)( ((*region) >> 8) & 0xFF );
-    m_rowBits     = (uint8_t)( ((*region) >> 16) & 0xFF );
+    m_eventBits   = (uint8_t)( ((*region) >> 8) & 0xFF );
+    m_channelBits = (uint8_t)( ((*region) >> 16) & 0xFF );
+    m_rowBits     = (uint8_t)( ((*region) >> 24) & 0xFF );
 
     region++;
 
-    LOG_PRINT(LOG_LEVEL_INFO, "\t\t\tMapping Connector:");
-    io_printf(IO_BUF, "\t\t\t\tShape (%d, %d), channel %d, rowBits %d, channelBits %d)\n",
-              m_width, m_height, m_channel, m_rowBits, m_channelBits);
+    LOG_PRINT(LOG_LEVEL_INFO, "\t\tMapping Connector:");
+    io_printf(IO_BUF,
+     "\t\t\t\tShape %d, %d; channel %d, rowBits %d, channelBits %d, eventBits %u\n",
+     m_width, m_height, m_channel, m_rowBits, m_channelBits, m_eventBits);
 
 }
 
@@ -76,34 +78,39 @@ unsigned int ConnectionBuilder::ConnectorGenerator::Mapping::Generate(
                                      MarsKiss64 &rng, uint16_t (&indices)[512]){
 //  LOG_PRINT(LOG_LEVEL_INFO, "-------------------In Mapping Connector Generator");
 
-  uint16_t chan = pre_idx & ((1 << m_channelBits) - 1);
+  uint16_t chan = (pre_idx >> m_eventBits) & ((1 << m_channelBits) - 1);
+
   if (chan != m_channel){
+//    io_printf(IO_BUF, "not the right channel!!!\n");
     return 0;
   }
+  uint8_t n_conns=0;
 
-  uint16_t pre_c = pre_idx >> (m_rowBits + m_channelBits);// = pre_idx%m_preWidth;
-  uint16_t pre_r = (pre_idx >> (m_channelBits)) & ((1 << m_rowBits) - 1);
+  uint16_t pre_c = pre_idx >> (m_rowBits + m_channelBits + m_eventBits);
+  uint16_t pre_r = (pre_idx >> (m_channelBits + m_eventBits)) & \
+                   ((1 << m_rowBits) - 1);
 
   uint16_t post_c;
   uint16_t post_r = uidiv(post_start, m_width, post_c);
   uint16_t post_end_r = uidiv((post_start+post_count), m_width, post_c);
 
+//  io_printf(IO_BUF, "pre %d < %d post s OR pre %d > %d post e \n",
+//                       pre_r, post_r, pre_r, post_end_r);
   if(pre_r < post_r || post_end_r < pre_r){
-//    io_printf(IO_BUF, "pre %d < %d post s OR post e %d < %d pre\n",
-//                       pre_r, post_r, post_end_r, pre_r);
     return 0;
   }
+
 
   for(uint16_t post_idx = post_start; post_idx < post_start + post_count;
       post_idx++){
     //post row and col from index
     post_r = uidiv(post_idx, m_width, post_c);
-
+//    io_printf(IO_BUF, "(%d, %d) == (%d, %d)?\n",
+//              pre_r, pre_c, post_r, post_c);
     if(pre_c == post_c && pre_r == post_r){
-//      io_printf(IO_BUF, "pre %d == (%d, %d) == post %d\n",
-//                pre_idx, pre_r, pre_c, post_idx);
-
-      indices[0] = post_idx - post_start;
+      io_printf(IO_BUF, "pre %d == (%d, %d) == post %d\n",
+                pre_idx, pre_r, pre_c, post_idx);
+      indices[n_conns] = post_idx - post_start;
       return 1;
     }
   }

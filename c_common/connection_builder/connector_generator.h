@@ -92,6 +92,7 @@ class Mapping : public Base{
     uint16_t m_height;
     uint16_t m_width;
     uint8_t m_channel;
+    uint8_t m_eventBits;
     uint8_t m_rowBits;
     uint8_t m_channelBits;
 

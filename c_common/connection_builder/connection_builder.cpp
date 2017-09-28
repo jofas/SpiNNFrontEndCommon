@@ -363,7 +363,6 @@ bool ReadConnectionBuilderRegion(uint32_t **in_region,
 //    LOG_PRINT(LOG_LEVEL_INFO, "\t\t%u", seed[s]);
   }
   const uint32_t connector_type_hash = *region++;
-//   const uint32_t max_rows            = *region++;
   const uint32_t pre_key             = *region++;
   const uint32_t pre_mask            = *region++;
   const uint32_t address_delta       = *region++;
@@ -403,8 +402,8 @@ bool ReadConnectionBuilderRegion(uint32_t **in_region,
             pre_key, pre_mask, address_delta);
 
   LOG_PRINT(LOG_LEVEL_INFO, "\tpre slice (%u, %u of %u), post slice (%u, %u)",
-            pre_slice_start, pre_slice_count, num_pre_neurons, post_slice_start,
-            post_slice_count);
+            pre_slice_start, pre_slice_start + pre_slice_count, num_pre_neurons,
+            post_slice_start, post_slice_start + post_slice_count);
 
   LOG_PRINT(LOG_LEVEL_INFO, "\tnumber of delay extension cores: %u",
             num_delayed_places);
@@ -439,6 +438,8 @@ bool ReadConnectionBuilderRegion(uint32_t **in_region,
   const auto delayGenerator = g_ParamGeneratorFactory.Create(delay_type_hash, 
                                          region, g_DelayParamGeneratorBuffer);
 
+  *in_region = region;
+
   // If any components couldn't be created return false
   if(matrixGenerator == NULL || connectorGenerator == NULL
     || delayGenerator == NULL || weightGenerator == NULL)
@@ -451,6 +452,7 @@ bool ReadConnectionBuilderRegion(uint32_t **in_region,
 #endif
 
   if(matrixGenerator->is_static){
+//    num_static = max_post_neurons;
     num_static = row_len;
   }
   else{
@@ -471,6 +473,7 @@ bool ReadConnectionBuilderRegion(uint32_t **in_region,
 //        LOG_PRINT(LOG_LEVEL_INFO, "no static nor plastic - synaptic matrix size = %u",
 //                  synaptic_matrix_region[0] >> 2);
     synaptic_matrix_region[(synaptic_matrix_region[0] >> 2) + 1] = 0;
+
     return true;
   }
 
@@ -537,7 +540,7 @@ bool ReadConnectionBuilderRegion(uint32_t **in_region,
     }
   }
 
-  *in_region = region;
+
 
   return true;
 }

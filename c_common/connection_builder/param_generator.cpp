@@ -69,20 +69,20 @@ ConnectionBuilder::ParamGenerator::ConvKernel::ConvKernel(uint32_t *&region){
     m_values = (int32_t *)region; //don't copy values, just address
     region += m_kernelHeight*m_kernelWidth;
 
-    LOG_PRINT(LOG_LEVEL_INFO, "\t\t\t\tValues:\n");
-    for(uint32_t r = 0; r < m_kernelHeight; r++){
-      io_printf(IO_BUF, "\t[ ");
-      for(uint32_t c = 0; c < m_kernelWidth; c++){
-        if( m_values[r*m_kernelWidth + c] < 0 ){
-          io_printf(IO_BUF, "-%4.6k\t", (-m_values[r*m_kernelWidth + c]));
-        }
-        else{
-          io_printf(IO_BUF, " %4.6k\t", m_values[r*m_kernelWidth + c]);
-        }
-      }
-      io_printf(IO_BUF, " ]\n");
-    }
-    io_printf(IO_BUF, "\n");
+//    LOG_PRINT(LOG_LEVEL_INFO, "\t\t\t\tValues:\n");
+//    for(uint32_t r = 0; r < m_kernelHeight; r++){
+//      io_printf(IO_BUF, "\t[ ");
+//      for(uint32_t c = 0; c < m_kernelWidth; c++){
+//        if( m_values[r*m_kernelWidth + c] < 0 ){
+//          io_printf(IO_BUF, "-%4.6k\t", (-m_values[r*m_kernelWidth + c]));
+//        }
+//        else{
+//          io_printf(IO_BUF, " %4.6k\t", m_values[r*m_kernelWidth + c]);
+//        }
+//      }
+//      io_printf(IO_BUF, " ]\n");
+//    }
+//    io_printf(IO_BUF, "\n");
 }
 
 void ConnectionBuilder::ParamGenerator::ConvKernel::Generate(
