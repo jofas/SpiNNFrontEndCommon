@@ -7,6 +7,7 @@ SpiNNMan >= 1!4.0.0a5, < 1!4.1.0
 SpiNNaker_PACMAN >= 1!4.0.0a5, < 1!4.1.0
 SpiNNaker_DataSpecification >= 1!4.0.0a5, < 1!4.1.0
 spalloc >= v0.2.2, < v1.0.0
+rig_cpp_common >= 0.1.0
 requests >= 2.4.1
 scipy >= 0.16.0
 numpy
