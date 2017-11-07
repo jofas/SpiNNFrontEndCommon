@@ -7,12 +7,6 @@ from spinn_front_end_common.utility_models.\
 from spinn_front_end_common.utility_models.\
     extra_monitor_support_machine_vertex import \
     ExtraMonitorSupportMachineVertex
-from spinn_front_end_common.utility_models.\
-    data_speed_up_packet_gatherer_machine_vertex import \
-    DataSpeedUpPacketGatherMachineVertex
-from spinn_front_end_common.utility_models.\
-    data_speed_up_packete_gatherer_application_vertex import \
-    DataSpeedUpPacketGatherApplicationVertex
 
 from spinn_utilities.progress_bar import ProgressBar
 
@@ -43,22 +37,18 @@ class InsertExtraMonitorVerticesToGraphs(object):
 
         vertex_to_ethernet_connected_chip_mapping = dict()
 
-        # progress data receiver for data extraction functionality
-        self._handle_data_extraction_vertices(
-            progress, machine, connection_mapping, application_graph,
-            machine_graph, graph_mapper,
-            vertex_to_ethernet_connected_chip_mapping)
-
         # handle re injector and chip based data extractor functionality.
         extra_monitor_vertices = self._handle_second_monitor_functionality(
-            progress, machine, application_graph, machine_graph, graph_mapper)
+            progress, machine, application_graph, machine_graph, graph_mapper,
+            vertex_to_ethernet_connected_chip_mapping, connection_mapping)
 
         return (vertex_to_ethernet_connected_chip_mapping,
                 extra_monitor_vertices)
 
     @staticmethod
     def _handle_second_monitor_functionality(
-            progress, machine, application_graph, machine_graph, graph_mapper):
+            progress, machine, application_graph, machine_graph, graph_mapper,
+            vertex_to_ethernet_connected_chip_mapping, connection_mapping):
         """
         handles placing the second monitor vertex with extra functionality\
          into the graph
@@ -67,6 +57,8 @@ class InsertExtraMonitorVerticesToGraphs(object):
         :param application_graph: app graph
         :param machine_graph: machine graph
         :param graph_mapper: graph mapper
+        :param connection_mapping: mapping between connection and ethernet chip
+        :param vertex_to_ethernet_connected_chip_mapping: vertex to chip map
         :rtype: list 
         :return: list of extra monitor cores 
         """
@@ -75,58 +67,29 @@ class InsertExtraMonitorVerticesToGraphs(object):
 
         for chip in progress.over(machine.chips):
 
+            # only ethernet connected chips have a ip address
+            connection = None
+            if chip.ip_address is not None:
+                connection = connection_mapping[(chip.x, chip.y)]
+
             # add to machine graph
             machine_vertex = ExtraMonitorSupportMachineVertex(
-                constraints=[ChipAndCoreConstraint(x=chip.x, y=chip.y)])
+                constraints=[ChipAndCoreConstraint(x=chip.x, y=chip.y)],
+                connection=connection)
             machine_graph.add_vertex(machine_vertex)
             extra_monitor_vertices.append(machine_vertex)
+
+            if chip.ip_address is not None:
+                # update mapping for edge builder
+                vertex_to_ethernet_connected_chip_mapping[
+                    (chip.x, chip.y)] = machine_vertex
 
             # add application graph as needed
             if application_graph is not None:
                 app_vertex = ExtraMonitorSupportApplicationVertex(
-                    constraints=[ChipAndCoreConstraint(x=chip.x, y=chip.y)])
+                    constraints=[ChipAndCoreConstraint(x=chip.x, y=chip.y)],
+                    connection=connection)
                 application_graph.add_vertex(app_vertex)
                 graph_mapper.add_vertex_mapping(
                     machine_vertex, Slice(0, 0), app_vertex)
         return extra_monitor_vertices
-
-    @staticmethod
-    def _handle_data_extraction_vertices(
-            progress, machine, connection_mapping, application_graph,
-            machine_graph, graph_mapper,
-            vertex_to_ethernet_connected_chip_mapping):
-        """ places vertices for receiving data extraction packets.
-
-        :param progress: progress bar
-        :param machine: machine instance
-        :param connection_mapping: mapping between connection and ethernet chip 
-        :param application_graph: application graph
-        :param machine_graph: machine graph
-        :param graph_mapper: graph mapper
-        :param vertex_to_ethernet_connected_chip_mapping: vertex to chip map
-        :rtype: None 
-        """
-        # insert machine vertices
-        for ethernet_connected_chip in progress.over(
-                machine.ethernet_connected_chips, finish_at_end=False):
-            connection = connection_mapping[
-                (ethernet_connected_chip.x, ethernet_connected_chip.y)]
-            machine_vertex = \
-                DataSpeedUpPacketGatherMachineVertex(
-                    connection, [ChipAndCoreConstraint(
-                        x=ethernet_connected_chip.x,
-                        y=ethernet_connected_chip.y)])
-            machine_graph.add_vertex(machine_vertex)
-
-            # update mapping for edge builder
-            vertex_to_ethernet_connected_chip_mapping[
-                (ethernet_connected_chip.x,
-                 ethernet_connected_chip.y)] = machine_vertex
-
-            # add application graph as needed
-            if application_graph is not None:
-                app_vertex = DataSpeedUpPacketGatherApplicationVertex()
-                application_graph.add_vertex(app_vertex)
-
-                graph_mapper.add_vertex_mapping(
-                    machine_vertex, Slice(0, 0), app_vertex)

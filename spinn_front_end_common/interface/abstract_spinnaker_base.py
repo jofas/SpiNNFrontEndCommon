@@ -3,8 +3,8 @@ main interface for the spinnaker tools
 """
 import spinn_utilities.conf_loader as conf_loader
 from spinn_front_end_common.utility_models.\
-    data_speed_up_packet_gatherer_machine_vertex import \
-    DataSpeedUpPacketGatherMachineVertex
+    extra_monitor_support_machine_vertex import \
+    ExtraMonitorSupportMachineVertex
 from spinn_utilities.timer import Timer
 from spinn_utilities import __version__ as spinn_utils_version
 
@@ -1508,7 +1508,7 @@ class AbstractSpinnakerBase(SimulatorInterface):
             algorithms.append("InsertExtraMonitorVerticesToGraphs")
             algorithms.append("FixedRouteRouter")
             inputs['FixedRouteDestinationClass'] = \
-                DataSpeedUpPacketGatherMachineVertex
+                ExtraMonitorSupportMachineVertex
 
 
         # handle extra mapping algorithms if required

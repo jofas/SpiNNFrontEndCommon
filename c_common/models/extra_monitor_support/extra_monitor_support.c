@@ -114,8 +114,16 @@ extern INT_HANDLER sark_int_han(void);
 // timer VIC slot
 #define TIMER_SLOT         SLOT_2
 
-// dma slot
+// dma slot VIC slot
 #define DMA_SLOT           SLOT_3
+
+// fixed route packet reception. VIC slot
+#define FIXED_ROUTE_SLOT    SLOT_4
+
+//-----------------------------------------------------------------------------
+// Serious magic numbers
+//-----------------------------------------------------------------------------
+
 
 #define RTR_BLOCKED_BIT    25
 #define RTR_DOVRFLW_BIT    30
@@ -212,6 +220,11 @@ typedef enum missing_seq_num_sdp_data_positions{
     START_OF_MISSING_SEQ_NUMS = 2
 }missing_seq_num_sdp_data_positions;
 
+// offsets for different fixed key commands
+typedef enum fixed_key_offsets{
+    NEW_SEQ_KEY_OFFSET = 1, FIRST_DATA_KEY_OFFSET = 2
+}fixed_key_offsets;
+
 
 // Dropped packet re-injection internal control commands (rc of SCP message)
 typedef enum reinjector_command_codes{
@@ -255,13 +268,19 @@ typedef enum functionality_to_port_num_map{
 }functionality_to_port_num_map;
 
 typedef enum data_spec_regions{
-    CONFIG_REINJECTION = 0, CONFIG_DATA_SPEED_UP = 1
+    CONFIG_REINJECTION = 0, CONFIG_DATA_SPEED_UP = 1,
+    CONFIG_DATA_RECEPTION = 2,
 }data_spec_regions;
 
 //! human readable definitions of each element in the transmission region
 typedef enum data_speed_config_data_elements{
     MY_KEY, MB
 }data_speed_config_data_elements;
+
+//! human readable definitions for each element in the data reception region
+typedef enum data_reception_data_elements{
+    TAG_ID = 0
+}data_reception_data_elements;
 
 //! values for the priority for each callback
 typedef enum callback_priorities{
@@ -1118,6 +1137,71 @@ void __wrap_sark_int(void *pc) {
 }
 
 //-----------------------------------------------------------------------------
+// data reception functionality
+//-----------------------------------------------------------------------------
+
+//! \brief handles the reception of a fixed route packet, storing its payload #
+//! adapting given command keys
+void handle_fixed_route_packet_reception(){
+
+     uint payload = cc[CC_RXDATA];
+     uint key = cc[CC_RXKEY];
+
+    //log_info("packet!");
+    if(key == new_sequence_key){
+        //log_info("finding new seq num %d", payload);
+        //log_info("position in store is %d", position_in_store);
+        data[0] = payload;
+    }
+    else{
+        if (key == first_data_key){
+            seq_num = FIRST_SEQ_NUM;
+        }
+
+        //log_info(" payload = %d posiiton = %d", payload, position_in_store);
+        data[position_in_store] = payload;
+        position_in_store += 1;
+        //log_info("payload is %d", payload);
+
+        if (payload == 0xFFFFFFFF){
+            if (position_in_store == 2){
+                data[0] = 0xFFFFFFFF;
+                position_in_store = 1;
+            }
+            //log_info("position = %d with seq num %d", position_in_store, seq_num);
+            //log_info("last payload was %d", payload);
+            send_sdp_packet_of_data();
+        }else if(position_in_store == ITEMS_PER_DATA_PACKET){
+            //log_info("position = %d with seq num %d", position_in_store, seq_num);
+            //log_info("last payload was %d", payload);
+            send_sdp_packet_of_data();
+        }
+    }
+}
+
+//! \brief sends a full sdp packet to the monitor core which sends it out to
+//! host for protocol receive
+void send_sdp_packet_of_data(){
+    //log_info("last element is %d", data[position_in_store - 1]);
+    //log_info("first element is %d", data[0]);
+
+    for(int index =0; index < position_in_store; index ++){
+        my_msg.data[index] = data[index];
+    }
+
+    my_msg.length =
+        LENGTH_OF_SDP_HEADER + (position_in_store * WORD_TO_BYTE_MULTIPLIER);
+    //log_info("my length is %d with position %d", my_msg.length, position_in_store);
+
+    while(!sark_msg_send((sdp_msg_t *) &my_msg, 100)){
+
+    }
+    position_in_store = 1;
+    seq_num += 1;
+    data[0] = seq_num;
+}
+
+//-----------------------------------------------------------------------------
 // initializers
 //-----------------------------------------------------------------------------
 
@@ -1180,6 +1264,30 @@ void data_speed_up_initialise(){
   dma[DMA_GCTL] = 0x000c00; // enable dma done interrupt
 }
 
+//! \brief sets up the data required for the data gatherer functonality.
+void data_receiver_initialise(){
+   vic_vectors[FIXED_ROUTE_SLOT]  = handle_fixed_route_packet_reception;
+   vic_controls[FIXED_ROUTE_SLOT] = 0x20 | CC_FR_INT;
+   new_sequence_key = key_to_transmit_with + NEW_SEQ_KEY_OFFSET;
+   first_data_key = key_to_transmit_with + FIRST_DATA_KEY_OFFSET;
+
+   // get to sdram store
+   vcpu_t *sark_virtual_processor_info = (vcpu_t*) SV_VCPU;
+   address_t address =
+       (address_t) sark_virtual_processor_info[sark.virt_cpu].user0;
+   address = (address_t) (address[DSG_HEADER + CONFIG_DATA_RECEPTION]);
+
+   // get tag id needed
+   my_msg.tag = address[TAG_ID];                    // IPTag 1
+   my_msg.dest_port = PORT_ETH;       // Ethernet
+   my_msg.dest_addr = sv->eth_addr;   // Nearest Ethernet chip
+
+   // fill in SDP source & flag fields
+   my_msg.flags = 0x07;
+   my_msg.srce_port = 3;
+   my_msg.srce_addr = sv->p2p_addr;
+}
+
 //-----------------------------------------------------------------------------
 // main method
 //-----------------------------------------------------------------------------
@@ -1209,6 +1317,9 @@ void c_main() {
 
     // set up data speed up functionality
     data_speed_up_initialise();
+
+    // set up for the reception and sdp message transmitter functionality
+    data_receiver_initialise();
 
     // Enable interrupts and timer
     vic[VIC_ENABLE] = int_select;

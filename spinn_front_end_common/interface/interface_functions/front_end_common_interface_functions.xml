@@ -54,7 +54,7 @@
             </parameter>
             <parameter>
                 <param_name>vertex_to_ethernet_connected_chip_mapping</param_name>
-                <param_type>MemoryMCGatherVertexToEthernetConnectedChipMapping</param_type>
+                <param_type>MemoryExtraMonitorVertexToEthernetConnectedChipMapping</param_type>
             </parameter>
         </input_definitions>
         <required_inputs>
@@ -108,7 +108,7 @@
             <param_name>n_cores_to_allocate</param_name>
         </optional_inputs>
         <outputs>
-            <param_type>MemoryMCGatherVertexToEthernetConnectedChipMapping</param_type>
+            <param_type>MemoryExtraMonitorVertexToEthernetConnectedChipMapping</param_type>
             <param_type>MemoryExtraMonitorVertices</param_type>
         </outputs>
     </algorithm>

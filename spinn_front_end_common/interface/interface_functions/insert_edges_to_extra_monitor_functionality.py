@@ -2,9 +2,6 @@ from pacman.model.graphs.application import ApplicationEdge
 from pacman.model.graphs.machine import MachineEdge
 from spinn_front_end_common.utilities import constants
 from spinn_front_end_common.utility_models.\
-    data_speed_up_packet_gatherer_machine_vertex import \
-    DataSpeedUpPacketGatherMachineVertex
-from spinn_front_end_common.utility_models.\
     extra_monitor_support_application_vertex import \
     ExtraMonitorSupportApplicationVertex
 from spinn_front_end_common.utility_models.\
@@ -88,7 +85,7 @@ class InsertEdgesToExtraMonitorFunctionality(object):
         if not already_built:
             machine_edge = MachineEdge(
                 vertex, data_gatherer_vertex,
-                traffic_type=DataSpeedUpPacketGatherMachineVertex.TRAFFIC_TYPE)
+                traffic_type=ExtraMonitorSupportMachineVertex.TRAFFIC_TYPE)
             machine_graph.add_edge(
                 machine_edge,
                 constants.PARTITION_ID_FOR_MULTICAST_DATA_SPEED_UP)
@@ -107,7 +104,7 @@ class InsertEdgesToExtraMonitorFunctionality(object):
                     app_edge = ApplicationEdge(
                         app_source, app_dest,
                         traffic_type=
-                        DataSpeedUpPacketGatherMachineVertex.TRAFFIC_TYPE)
+                        ExtraMonitorSupportMachineVertex.TRAFFIC_TYPE)
                     application_graph.add_edge(
                         app_edge,
                         constants.PARTITION_ID_FOR_MULTICAST_DATA_SPEED_UP)
