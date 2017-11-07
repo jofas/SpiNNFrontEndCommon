@@ -55,6 +55,17 @@ extern INT_HANDLER sark_int_han(void);
 #define SEQUENCE_NUMBER_SIZE 1
 
 #define TX_NOT_FULL_MASK 0x10000000
+
+//-----------------------------------------------------------------------------
+// magic numbers for data speed up extractor gatherer component
+//-----------------------------------------------------------------------------
+
+//! first sequence number to use and reset to
+#define FIRST_SEQ_NUM 0
+
+//! extra length adjustment for the sdp header
+#define LENGTH_OF_SDP_HEADER 8
+
 //-----------------------------------------------------------------------------
 //! sdp flags
 //-----------------------------------------------------------------------------
@@ -323,6 +334,26 @@ sdp_msg_pure_data my_msg;
 static uint32_t bytes_to_read_write;
 static address_t *store_address = NULL;
 static uint32_t key_to_transmit_with;
+
+// ------------------------------------------------------------------------
+// globals for the gatherer component
+// ------------------------------------------------------------------------
+
+//! store for the fixed route packets
+static uint32_t data[ITEMS_PER_DATA_PACKET];
+
+//! position in store for the fixed route sdp packet
+static uint32_t position_in_sdp_message_store = 0;
+
+//! sdp message holder for transmissions
+sdp_msg_pure_data my_msg;
+
+//! default seq num used by sdp packet transmissions
+static uint32_t seq_num = FIRST_SEQ_NUM;
+
+//! the key that causes sequence number to be processed
+static uint32_t new_sequence_key = 0;
+static uint32_t first_data_key = 0;
 
 // ------------------------------------------------------------------------
 // reinjector main functions
