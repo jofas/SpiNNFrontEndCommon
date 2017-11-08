@@ -112,13 +112,13 @@ extern INT_HANDLER sark_int_han(void);
 #define CC_SLOT            SLOT_1
 
 // timer VIC slot
-#define TIMER_SLOT         SLOT_2
+#define TIMER_SLOT         SLOT_3
 
 // dma slot VIC slot
-#define DMA_SLOT           SLOT_3
+#define DMA_SLOT           SLOT_4
 
 // fixed route packet reception. VIC slot
-#define FIXED_ROUTE_SLOT    SLOT_4
+#define FIXED_ROUTE_SLOT    SLOT_2
 
 //-----------------------------------------------------------------------------
 // Serious magic numbers
@@ -279,7 +279,7 @@ typedef enum data_speed_config_data_elements{
 
 //! human readable definitions for each element in the data reception region
 typedef enum data_reception_data_elements{
-    TAG_ID = 0
+    HAS_TAG = 0, TAG_ID = 1
 }data_reception_data_elements;
 
 //! values for the priority for each callback
@@ -1142,10 +1142,12 @@ void __wrap_sark_int(void *pc) {
 
 //! \brief handles the reception of a fixed route packet, storing its payload #
 //! adapting given command keys
-void handle_fixed_route_packet_reception(){
+INT_HANDLER handle_fixed_route_packet_reception(void){
+    uint rx_status = cc[CC_RSR];
+    uint payload = cc[CC_RXDATA];
+    uint key = cc[CC_RXKEY];
 
-     uint payload = cc[CC_RXDATA];
-     uint key = cc[CC_RXKEY];
+    io_printf(IO_BUF, "fixed packet key %d, payload %d\n", key, payload);
 
     //log_info("packet!");
     if(key == new_sequence_key){
@@ -1177,6 +1179,8 @@ void handle_fixed_route_packet_reception(){
             send_sdp_packet_of_data();
         }
     }
+    // and tell VIC we're done
+    vic[VIC_VADDR] = (uint) vic;
 }
 
 //! \brief sends a full sdp packet to the monitor core which sends it out to
@@ -1266,8 +1270,12 @@ void data_speed_up_initialise(){
 
 //! \brief sets up the data required for the data gatherer functonality.
 void data_receiver_initialise(){
+
+   // set up fixed route inturupt
    vic_vectors[FIXED_ROUTE_SLOT]  = handle_fixed_route_packet_reception;
    vic_controls[FIXED_ROUTE_SLOT] = 0x20 | CC_FR_INT;
+
+   // set up command keys
    new_sequence_key = key_to_transmit_with + NEW_SEQ_KEY_OFFSET;
    first_data_key = key_to_transmit_with + FIRST_DATA_KEY_OFFSET;
 
@@ -1278,14 +1286,16 @@ void data_receiver_initialise(){
    address = (address_t) (address[DSG_HEADER + CONFIG_DATA_RECEPTION]);
 
    // get tag id needed
-   my_msg.tag = address[TAG_ID];                    // IPTag 1
-   my_msg.dest_port = PORT_ETH;       // Ethernet
-   my_msg.dest_addr = sv->eth_addr;   // Nearest Ethernet chip
+   if (address[HAS_TAG] == 0){
+       my_msg.tag = address[TAG_ID];                    // IPTag 1
+       my_msg.dest_port = PORT_ETH;       // Ethernet
+       my_msg.dest_addr = sv->eth_addr;   // Nearest Ethernet chip
 
-   // fill in SDP source & flag fields
-   my_msg.flags = 0x07;
-   my_msg.srce_port = 3;
-   my_msg.srce_addr = sv->p2p_addr;
+       // fill in SDP source & flag fields
+       my_msg.flags = 0x07;
+       my_msg.srce_port = 3;
+       my_msg.srce_addr = sv->p2p_addr;
+   }
 }
 
 //-----------------------------------------------------------------------------
@@ -1308,7 +1318,7 @@ void c_main() {
     // set up vict callbacks and interrupts accordingly
     // Disable the interrupts that we are configuring (except CPU for watchdog)
     uint int_select = (1 << TIMER1_INT) | (1 << RTR_DUMP_INT) |
-                      (1 << DMA_DONE_INT);
+                      (1 << DMA_DONE_INT) | (1 < CC_FR_INT);
     vic[VIC_DISABLE] = int_select;
     vic[VIC_DISABLE] = (1 << CC_TNF_INT);
 

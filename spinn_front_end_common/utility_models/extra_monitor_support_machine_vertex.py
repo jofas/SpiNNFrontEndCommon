@@ -91,7 +91,7 @@ class ExtraMonitorSupportMachineVertex(
 
     _CONFIG_REGION_REINEJCTOR_SIZE_IN_BYTES = 4 * 4
     _CONFIG_DATA_SPEED_UP_SIZE_IN_BYTES = 1 * 4
-    _CONFIG_DATA_RECEPTION_SIZE_IN_BYTES = 1 * 4
+    _CONFIG_DATA_RECEPTION_SIZE_IN_BYTES = 2 * 4
 
     # size of config region in bytes
     CONFIG_SIZE = 8
@@ -315,6 +315,11 @@ class ExtraMonitorSupportMachineVertex(
         if iptags is not None and len(iptags) != 1:
             raise Exception(
                 "should only have 1 or 0 iptags associated with this vertex")
+
+        if self._connection is not None:
+            spec.write_value(1)
+        else:
+            spec.write_value(0)
 
         if self._connection is not None:
             tag = iptags[0]
@@ -572,6 +577,10 @@ class ExtraMonitorSupportMachineVertex(
         :param seq_nums: the set already acquired
         :return: list of missing seq nums
         """
+        if self._max_seq_num is None:
+            raise Exception(
+                "Have not heard from the machine. Something went boom!")
+
         missing_seq_nums = list()
         for seq_num in range(1, self._max_seq_num):
             if seq_num not in seq_nums:
@@ -589,7 +598,6 @@ class ExtraMonitorSupportMachineVertex(
         :return: true or false based on if finished or not
         """
         # locate missing seq nums from pile
-
         missing_seq_nums = self._calculate_missing_seq_nums(seq_nums)
         self._lost_seq_nums.append(len(missing_seq_nums))
         # self._print_missing(seq_nums)
