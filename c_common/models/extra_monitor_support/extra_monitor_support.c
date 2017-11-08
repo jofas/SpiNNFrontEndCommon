@@ -1203,8 +1203,6 @@ void process_received_key_payload(uint key, uint payload){
             send_sdp_packet_of_data_blah();
         }
     }
-    // and tell VIC we're done
-    vic[VIC_VADDR] = (uint) vic;
 }
 
 //! \brief handles the reception of a fixed route packet, storing its payload #
@@ -1214,6 +1212,8 @@ INT_HANDLER handle_fixed_route_packet_reception(){
     uint payload = cc[CC_RXDATA];
     uint key = cc[CC_RXKEY];
     process_received_key_payload(key, payload);
+    // and tell VIC we're done
+    vic[VIC_VADDR] = (uint) vic;
 }
 
 //-----------------------------------------------------------------------------
