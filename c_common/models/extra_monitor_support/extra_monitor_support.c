@@ -345,9 +345,6 @@ static uint32_t missing_seq_num_being_processed = 0;
 static uint32_t position_in_read_data = 0;
 static uint32_t dma_port_last_used = 0;
 
-//! sdp message holder for transmissions
-sdp_msg_pure_data my_msg;
-
 //! state for how many bytes it needs to send, gives approx bandwidth if
 //! round number.
 static uint32_t bytes_to_read_write;
@@ -359,13 +356,13 @@ static uint32_t key_to_transmit_with;
 // ------------------------------------------------------------------------
 
 //! store for the fixed route packets
-static uint32_t data[ITEMS_PER_DATA_PACKET];
+static uint32_t sdp_packet_data[ITEMS_PER_DATA_PACKET];
 
 //! position in store for the fixed route sdp packet
 static uint32_t position_in_sdp_message_store = 0;
 
 //! sdp message holder for transmissions
-sdp_msg_pure_data my_msg;
+sdp_msg_pure_data my_sdp_msg;
 
 //! default seq num used by sdp packet transmissions
 static uint32_t seq_num = FIRST_SEQ_NUM;
@@ -373,6 +370,10 @@ static uint32_t seq_num = FIRST_SEQ_NUM;
 //! the key that causes sequence number to be processed
 static uint32_t new_sequence_key = 0;
 static uint32_t first_data_key = 0;
+
+//! flag saying if this core is ona  ethernet chip. if so, dont need to fire
+//! fixed route packets, can send them directly to the function call
+static bool is_on_ethernet_connected_chip = false;
 
 // ------------------------------------------------------------------------
 // reinjector main functions
@@ -748,11 +749,17 @@ void send_data_block(
         uint32_t current_data =
             data_to_transmit[current_dma_pointer][data_position];
 
-        while((cc[CC_TCR] & TX_NOT_FULL_MASK) == 0){
+        if (!is_on_ethernet_connected_chip){
+
+            while((cc[CC_TCR] & TX_NOT_FULL_MASK) == 0){
+            }
+            cc[CC_TCR] = PKT_FR_PL;
+            cc[CC_TXDATA] = current_data;
+            cc[CC_TXKEY]  = first_packet_key;
         }
-        cc[CC_TCR] = PKT_FR_PL;
-        cc[CC_TXDATA] = current_data;
-        cc[CC_TXKEY]  = first_packet_key;
+        else{
+            process_received_key_payload(first_packet_key, current_data);
+        }
 
         // update key to transmit with
         first_packet_key = key_to_transmit_with;
@@ -789,12 +796,18 @@ void read(uint32_t dma_tag, uint32_t offset, uint32_t items_to_read){
 
 //! \brief sends a end flag via multicast
 void data_speed_up_send_end_flag(){
-    // verify that the router can take the packet
-    while((cc[CC_TCR] & TX_NOT_FULL_MASK) == 0){
+
+    if (!is_on_ethernet_connected_chip){
+        // verify that the router can take the packet
+        while((cc[CC_TCR] & TX_NOT_FULL_MASK) == 0){
+        }
+        cc[CC_TCR] = PKT_FR_PL;
+        cc[CC_TXDATA] = END_FLAG;
+        cc[CC_TXKEY]  = key_to_transmit_with;
     }
-    cc[CC_TCR] = PKT_FR_PL;
-    cc[CC_TXDATA] = END_FLAG;
-    cc[CC_TXKEY]  = key_to_transmit_with;
+    else {
+        process_received_key_payload(key_to_transmit_with, END_FLAG);
+    }
 }
 
 //! \brief dma complete callback for reading for original transmission
@@ -1076,7 +1089,7 @@ INT_HANDLER speed_up_handle_dma(){
     }else if(dma_port_last_used == DMA_TAG_FOR_WRITING_MISSING_SEQ_NUMS){
         dma_complete_writing_missing_seq_to_sdram();
     }else{
-        io_printf(IO_BUF, "NOT VALID DMA CALLBACK PORT!!!!\n");
+        io_printf(IO_BUF, "NOT VALID DMA CALLBACK PORT!!!! %d\n", dma_port_last_used);
     }
     // and tell VIC we're done
     vic[VIC_VADDR] = (uint) vic;
@@ -1140,69 +1153,67 @@ void __wrap_sark_int(void *pc) {
 // data reception functionality
 //-----------------------------------------------------------------------------
 
-//! \brief handles the reception of a fixed route packet, storing its payload #
-//! adapting given command keys
-INT_HANDLER handle_fixed_route_packet_reception(void){
-    uint rx_status = cc[CC_RSR];
-    uint payload = cc[CC_RXDATA];
-    uint key = cc[CC_RXKEY];
 
-    io_printf(IO_BUF, "fixed packet key %d, payload %d\n", key, payload);
+//! \brief sends a full sdp packet to the monitor core which sends it out to
+//! host for protocol receive
+void send_sdp_packet_of_data_blah(){
 
-    //log_info("packet!");
+    for(int index =0; index < position_in_sdp_message_store; index ++){
+        my_sdp_msg.data[index] = sdp_packet_data[index];
+    }
+    my_sdp_msg.length =
+        LENGTH_OF_SDP_HEADER + (
+        position_in_sdp_message_store * WORD_TO_BYTE_MULTIPLIER);
+
+    // reset data space, as no issues now
+    position_in_sdp_message_store = 1;
+    seq_num += 1;
+    sdp_packet_data[0] = seq_num;
+
+
+    while(!sark_msg_send((sdp_msg_t *) &my_sdp_msg, 100)){
+    }
+
+}
+
+
+//! brief function for processing the key and payload of a fixed route packet
+//! \parm[in] key: the key of the packet
+//! \param[in] payload: the payload of the packet
+void process_received_key_payload(uint key, uint payload){
+
+
     if(key == new_sequence_key){
-        //log_info("finding new seq num %d", payload);
-        //log_info("position in store is %d", position_in_store);
-        data[0] = payload;
+        sdp_packet_data[0] = payload;
     }
     else{
         if (key == first_data_key){
             seq_num = FIRST_SEQ_NUM;
         }
 
-        //log_info(" payload = %d posiiton = %d", payload, position_in_store);
-        data[position_in_store] = payload;
-        position_in_store += 1;
-        //log_info("payload is %d", payload);
-
+        sdp_packet_data[position_in_sdp_message_store] = payload;
+        position_in_sdp_message_store += 1;
         if (payload == 0xFFFFFFFF){
-            if (position_in_store == 2){
-                data[0] = 0xFFFFFFFF;
-                position_in_store = 1;
+            if (position_in_sdp_message_store == 2){
+                sdp_packet_data[0] = 0xFFFFFFFF;
+                position_in_sdp_message_store = 1;
             }
-            //log_info("position = %d with seq num %d", position_in_store, seq_num);
-            //log_info("last payload was %d", payload);
-            send_sdp_packet_of_data();
-        }else if(position_in_store == ITEMS_PER_DATA_PACKET){
-            //log_info("position = %d with seq num %d", position_in_store, seq_num);
-            //log_info("last payload was %d", payload);
-            send_sdp_packet_of_data();
+            send_sdp_packet_of_data_blah();
+        }else if(position_in_sdp_message_store == ITEMS_PER_DATA_PACKET){
+            send_sdp_packet_of_data_blah();
         }
     }
     // and tell VIC we're done
     vic[VIC_VADDR] = (uint) vic;
 }
 
-//! \brief sends a full sdp packet to the monitor core which sends it out to
-//! host for protocol receive
-void send_sdp_packet_of_data(){
-    //log_info("last element is %d", data[position_in_store - 1]);
-    //log_info("first element is %d", data[0]);
-
-    for(int index =0; index < position_in_store; index ++){
-        my_msg.data[index] = data[index];
-    }
-
-    my_msg.length =
-        LENGTH_OF_SDP_HEADER + (position_in_store * WORD_TO_BYTE_MULTIPLIER);
-    //log_info("my length is %d with position %d", my_msg.length, position_in_store);
-
-    while(!sark_msg_send((sdp_msg_t *) &my_msg, 100)){
-
-    }
-    position_in_store = 1;
-    seq_num += 1;
-    data[0] = seq_num;
+//! \brief handles the reception of a fixed route packet, storing its payload #
+//! adapting given command keys
+INT_HANDLER handle_fixed_route_packet_reception(){
+    uint rx_status = cc[CC_RSR];
+    uint payload = cc[CC_RXDATA];
+    uint key = cc[CC_RXKEY];
+    process_received_key_payload(key, payload);
 }
 
 //-----------------------------------------------------------------------------
@@ -1271,7 +1282,7 @@ void data_speed_up_initialise(){
 //! \brief sets up the data required for the data gatherer functonality.
 void data_receiver_initialise(){
 
-   // set up fixed route inturupt
+   // set up fixed route interrupt
    vic_vectors[FIXED_ROUTE_SLOT]  = handle_fixed_route_packet_reception;
    vic_controls[FIXED_ROUTE_SLOT] = 0x20 | CC_FR_INT;
 
@@ -1287,14 +1298,16 @@ void data_receiver_initialise(){
 
    // get tag id needed
    if (address[HAS_TAG] == 0){
-       my_msg.tag = address[TAG_ID];                    // IPTag 1
-       my_msg.dest_port = PORT_ETH;       // Ethernet
-       my_msg.dest_addr = sv->eth_addr;   // Nearest Ethernet chip
+       io_printf(IO_BUF, "set tag\n");
+       my_sdp_msg.tag = address[TAG_ID];                    // IPTag 1
+       my_sdp_msg.dest_port = PORT_ETH;       // Ethernet
+       my_sdp_msg.dest_addr = sv->eth_addr;   // Nearest Ethernet chip
 
        // fill in SDP source & flag fields
-       my_msg.flags = 0x07;
-       my_msg.srce_port = 3;
-       my_msg.srce_addr = sv->p2p_addr;
+       my_sdp_msg.flags = 0x07;
+       my_sdp_msg.srce_port = 3;
+       my_sdp_msg.srce_addr = sv->p2p_addr;
+       is_on_ethernet_connected_chip = true;
    }
 }
 

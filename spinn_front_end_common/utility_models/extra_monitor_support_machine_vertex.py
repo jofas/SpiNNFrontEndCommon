@@ -317,9 +317,9 @@ class ExtraMonitorSupportMachineVertex(
                 "should only have 1 or 0 iptags associated with this vertex")
 
         if self._connection is not None:
-            spec.write_value(1)
-        else:
             spec.write_value(0)
+        else:
+            spec.write_value(1)
 
         if self._connection is not None:
             tag = iptags[0]
