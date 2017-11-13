@@ -79,12 +79,8 @@ unsigned int ConnectionBuilder::ConnectorGenerator::Mapping::Generate(
 //  LOG_PRINT(LOG_LEVEL_INFO, "-------------------In Mapping Connector Generator");
 
   uint16_t chan = (pre_idx >> m_eventBits) & ((1 << m_channelBits) - 1);
-  uint16_t e_mask = ((1 << m_eventBits) - 1);
-  uint16_t event = pre_idx & e_mask;
 
-  e_mask >>= 1;
-
-  if (chan != m_channel || event <= 1 ){
+  if (chan != m_channel || pre_idx == 1 || pre_idx == 0){
   // TODO: not cool, this should be passed in from python
 //    io_printf(IO_BUF, "not the right channel!!!\n");
 //    io_printf(IO_BUF, "Channel %u\tEvent %u\n", chan, event);
