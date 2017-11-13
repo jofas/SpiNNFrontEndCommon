@@ -58,14 +58,14 @@ ConnectionBuilder::ConnectorGenerator::Mapping::Mapping(uint32_t *&region){
     m_channel     = (uint8_t)( (*region) & 0xFF );
     m_eventBits   = (uint8_t)( ((*region) >> 8) & 0xFF );
     m_channelBits = (uint8_t)( ((*region) >> 16) & 0xFF );
-    m_rowBits     = (uint8_t)( ((*region) >> 24) & 0xFF );
+    m_heightBits     = (uint8_t)( ((*region) >> 24) & 0xFF );
 
     region++;
 
     LOG_PRINT(LOG_LEVEL_INFO, "\t\tMapping Connector:");
     io_printf(IO_BUF,
      "\t\t\t\tShape %d, %d; channel %d, rowBits %d, channelBits %d, eventBits %u\n",
-     m_width, m_height, m_channel, m_rowBits, m_channelBits, m_eventBits);
+     m_width, m_height, m_channel, m_heightBits, m_channelBits, m_eventBits);
 
 }
 
@@ -79,16 +79,24 @@ unsigned int ConnectionBuilder::ConnectorGenerator::Mapping::Generate(
 //  LOG_PRINT(LOG_LEVEL_INFO, "-------------------In Mapping Connector Generator");
 
   uint16_t chan = (pre_idx >> m_eventBits) & ((1 << m_channelBits) - 1);
+  uint16_t e_mask = ((1 << m_eventBits) - 1);
+  uint16_t event = pre_idx & e_mask;
 
-  if (chan != m_channel){
+  e_mask >>= 1;
+
+  if (chan != m_channel || event <= 1 ){
+  // TODO: not cool, this should be passed in from python
 //    io_printf(IO_BUF, "not the right channel!!!\n");
+//    io_printf(IO_BUF, "Channel %u\tEvent %u\n", chan, event);
     return 0;
   }
   uint8_t n_conns=0;
 
-  uint16_t pre_c = pre_idx >> (m_rowBits + m_channelBits + m_eventBits);
+  // X
+  uint16_t pre_c = pre_idx >> (m_heightBits + m_channelBits + m_eventBits);
+  // Y
   uint16_t pre_r = (pre_idx >> (m_channelBits + m_eventBits)) & \
-                   ((1 << m_rowBits) - 1);
+                   ((1 << m_heightBits) - 1);
 
   uint16_t post_c;
   uint16_t post_r = uidiv(post_start, m_width, post_c);
@@ -107,9 +115,9 @@ unsigned int ConnectionBuilder::ConnectorGenerator::Mapping::Generate(
     post_r = uidiv(post_idx, m_width, post_c);
 //    io_printf(IO_BUF, "(%d, %d) == (%d, %d)?\n",
 //              pre_r, pre_c, post_r, post_c);
-    if(pre_c == post_c && pre_r == post_r){
-      io_printf(IO_BUF, "pre %d == (%d, %d) == post %d\n",
-                pre_idx, pre_r, pre_c, post_idx);
+    if(pre_c == post_c && pre_r == post_r ){
+//      io_printf(IO_BUF, "pre %d == (%d, %d) == post %d\n",
+//                pre_idx, pre_r, pre_c, post_idx);
       indices[n_conns] = post_idx - post_start;
       return 1;
     }
