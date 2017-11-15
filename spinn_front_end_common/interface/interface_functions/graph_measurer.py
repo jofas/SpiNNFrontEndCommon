@@ -9,6 +9,24 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def run(self, machine_graph, machine):
+
+    # check that the algorithm can handle the constraints
+    ResourceTracker.check_constraints(machine_graph.vertices)
+
+    ordered_vertices = \
+        placer_algorithm_utilities.sort_vertices_by_known_constraints(
+            machine_graph.vertices)
+
+    # Iterate over vertices and allocate
+    progress = ProgressBar(machine_graph.n_vertices, "Measuring the graph")
+    resource_tracker = ResourceTracker(machine)
+    for vertex in progress.over(ordered_vertices):
+        resource_tracker.allocate_constrained_resources(
+            vertex.resources_required, vertex.constraints)
+    return len(resource_tracker.keys)
+
+
 class GraphMeasurer(object):
     """ Works out how many chips a machine graph needs
     """
@@ -24,18 +42,4 @@ class GraphMeasurer(object):
         :return: The size of the graph in number of chips
         :rtype: int
         """
-
-        # check that the algorithm can handle the constraints
-        ResourceTracker.check_constraints(machine_graph.vertices)
-
-        ordered_vertices = \
-            placer_algorithm_utilities.sort_vertices_by_known_constraints(
-                machine_graph.vertices)
-
-        # Iterate over vertices and allocate
-        progress = ProgressBar(machine_graph.n_vertices, "Measuring the graph")
-        resource_tracker = ResourceTracker(machine)
-        for vertex in progress.over(ordered_vertices):
-            resource_tracker.allocate_constrained_resources(
-                vertex.resources_required, vertex.constraints)
-        return len(resource_tracker.keys)
+        return run(machine_graph, machine)

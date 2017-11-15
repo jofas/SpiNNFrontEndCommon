@@ -72,14 +72,58 @@ class _SpallocJobController(Thread, AbstractMachineAllocationController):
             sys.exit(1)
 
 
+# Use a worst case calculation
+_N_CHIPS_PER_BOARD = 48.0
+_MACHINE_VERSION = 5
+
+
+def run(spalloc_server, spalloc_user, n_chips, spalloc_port=None,
+        spalloc_machine=None):
+
+    # Work out how many boards are needed
+    n_boards = float(n_chips) / _N_CHIPS_PER_BOARD
+
+    # If the number of boards rounded up is less than 10% bigger than the
+    # actual number of boards, add another board just in case
+    if math.ceil(n_boards) - n_boards < 0.1:
+        n_boards += 1
+    n_boards = int(math.ceil(n_boards))
+
+    spalloc_kw_args = {
+        'hostname': spalloc_server,
+        'owner': spalloc_user
+    }
+    if spalloc_port is not None:
+        spalloc_kw_args['port'] = spalloc_port
+    if spalloc_machine is not None:
+        spalloc_kw_args['machine'] = spalloc_machine
+
+    job, hostname = _launch_job(n_boards, spalloc_kw_args)
+    machine_allocation_controller = _SpallocJobController(job)
+    machine_allocation_controller.start()
+
+    return (
+        hostname, _MACHINE_VERSION, None, None, None, None, False,
+        False, None, None, None, machine_allocation_controller
+    )
+
+
+def _launch_job(n_boards, spalloc_kw_args):
+    job = Job(n_boards, **spalloc_kw_args)
+    try:
+        job.wait_until_ready()
+        # get param from jobs before starting, so that hanging doesn't
+        # occur
+        return job, job.hostname
+    except Exception:
+        job.destroy()
+        raise
+
+
 class SpallocAllocator(object):
     """ Request a machine from a SPALLOC server that will fit the given\
         number of chips
     """
-
-    # Use a worst case calculation
-    _N_CHIPS_PER_BOARD = 48.0
-    _MACHINE_VERSION = 5
 
     def __call__(
             self, spalloc_server, spalloc_user, n_chips, spalloc_port=None,
@@ -94,41 +138,6 @@ class SpallocAllocator(object):
         :param spalloc_port: The optional port number to speak to spalloc
         :param spalloc_machine: The optional spalloc machine to use
         """
-
-        # Work out how many boards are needed
-        n_boards = float(n_chips) / self._N_CHIPS_PER_BOARD
-
-        # If the number of boards rounded up is less than 10% bigger than the
-        # actual number of boards, add another board just in case
-        if math.ceil(n_boards) - n_boards < 0.1:
-            n_boards += 1
-        n_boards = int(math.ceil(n_boards))
-
-        spalloc_kw_args = {
-            'hostname': spalloc_server,
-            'owner': spalloc_user
-        }
-        if spalloc_port is not None:
-            spalloc_kw_args['port'] = spalloc_port
-        if spalloc_machine is not None:
-            spalloc_kw_args['machine'] = spalloc_machine
-
-        job, hostname = self._launch_job(n_boards, spalloc_kw_args)
-        machine_allocation_controller = _SpallocJobController(job)
-        machine_allocation_controller.start()
-
-        return (
-            hostname, self._MACHINE_VERSION, None, None, None, None, False,
-            False, None, None, None, machine_allocation_controller
-        )
-
-    def _launch_job(self, n_boards, spalloc_kw_args):
-        job = Job(n_boards, **spalloc_kw_args)
-        try:
-            job.wait_until_ready()
-            # get param from jobs before starting, so that hanging doesn't
-            # occur
-            return job, job.hostname
-        except Exception:
-            job.destroy()
-            raise
+        return run(
+            spalloc_server, spalloc_user, n_chips, spalloc_port,
+            spalloc_machine)

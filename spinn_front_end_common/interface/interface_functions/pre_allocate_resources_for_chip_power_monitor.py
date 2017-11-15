@@ -14,6 +14,43 @@ from spinn_front_end_common.utility_models.\
 from spinn_utilities.progress_bar import ProgressBar
 
 
+def run(self, machine, n_machine_time_steps, n_samples_per_recording,
+        sampling_frequency, time_scale_factor, machine_time_step,
+        pre_allocated_resources=None):
+    progress_bar = ProgressBar(
+        len(list(machine.chips)),
+        "Preallocating resources for chip power monitor")
+
+    # store how much SDRAM the LPG uses per core
+    resources = ChipPowerMonitorMachineVertex.get_resources(
+        n_machine_time_steps=n_machine_time_steps,
+        n_samples_per_recording=n_samples_per_recording,
+        sampling_frequency=sampling_frequency,
+        time_scale_factor=time_scale_factor,
+        time_step=machine_time_step)
+
+    # for every Ethernet connected chip, get the resources needed by the
+    # live packet gatherers
+    sdrams = list()
+    cores = list()
+    for chip in progress_bar.over(machine.chips):
+        sdrams.append(
+            SpecificChipSDRAMResource(chip, resources.sdram.get_value()))
+        cores.append(CoreResource(chip, 1))
+
+    # create pre allocated resource container
+    cpm_pre_allocated_resource_container = PreAllocatedResourceContainer(
+        specific_sdram_usage=sdrams, core_resources=cores)
+
+    # add other pre allocated resources
+    if pre_allocated_resources is not None:
+        cpm_pre_allocated_resource_container.extend(
+            pre_allocated_resources)
+
+    # return pre allocated resources
+    return cpm_pre_allocated_resource_container
+
+
 class PreAllocateResourcesForChipPowerMonitor(object):
     """ Adds chip power monitor resources as required for a machine
     """
@@ -33,36 +70,7 @@ class PreAllocateResourcesForChipPowerMonitor(object):
         :param machine_time_step: the machine time step
         :return: pre allocated resources
         """
-
-        progress_bar = ProgressBar(
-            len(list(machine.chips)),
-            "Preallocating resources for chip power monitor")
-
-        # store how much SDRAM the LPG uses per core
-        resources = ChipPowerMonitorMachineVertex.get_resources(
-            n_machine_time_steps=n_machine_time_steps,
-            n_samples_per_recording=n_samples_per_recording,
-            sampling_frequency=sampling_frequency,
-            time_scale_factor=time_scale_factor,
-            time_step=machine_time_step)
-
-        # for every Ethernet connected chip, get the resources needed by the
-        # live packet gatherers
-        sdrams = list()
-        cores = list()
-        for chip in progress_bar.over(machine.chips):
-            sdrams.append(
-                SpecificChipSDRAMResource(chip, resources.sdram.get_value()))
-            cores.append(CoreResource(chip, 1))
-
-        # create pre allocated resource container
-        cpm_pre_allocated_resource_container = PreAllocatedResourceContainer(
-            specific_sdram_usage=sdrams, core_resources=cores)
-
-        # add other pre allocated resources
-        if pre_allocated_resources is not None:
-            cpm_pre_allocated_resource_container.extend(
-                pre_allocated_resources)
-
-        # return pre allocated resources
-        return cpm_pre_allocated_resource_container
+        return run(
+            machine, n_machine_time_steps, n_samples_per_recording,
+            sampling_frequency, time_scale_factor, machine_time_step,
+            pre_allocated_resources)

@@ -2,6 +2,23 @@
 from spinn_machine import VirtualMachine
 
 
+def run(width=None, height=None, virtual_has_wrap_arounds=None,
+        version=None, n_cpus_per_chip=18, with_monitors=True,
+        down_chips=None, down_cores=None, down_links=None):
+    machine = VirtualMachine(
+        width=width, height=height,
+        with_wrap_arounds=virtual_has_wrap_arounds,
+        version=version, n_cpus_per_chip=n_cpus_per_chip,
+        with_monitors=with_monitors, down_chips=down_chips,
+        down_cores=down_cores, down_links=down_links)
+
+    # Work out and add the spinnaker links and FPGA links
+    machine.add_spinnaker_links(version)
+    machine.add_fpga_links(version)
+
+    return machine
+
+
 class VirtualMachineGenerator(object):
 
     __slots__ = []
@@ -19,16 +36,5 @@ class VirtualMachineGenerator(object):
         :param n_cpus_per_chip: The number of cores to put on each chip
         :param with_monitors: If true, CPU 0 will be marked as a monitor
         """
-
-        machine = VirtualMachine(
-            width=width, height=height,
-            with_wrap_arounds=virtual_has_wrap_arounds,
-            version=version, n_cpus_per_chip=n_cpus_per_chip,
-            with_monitors=with_monitors, down_chips=down_chips,
-            down_cores=down_cores, down_links=down_links)
-
-        # Work out and add the spinnaker links and FPGA links
-        machine.add_spinnaker_links(version)
-        machine.add_fpga_links(version)
-
-        return machine
+        run(width, height, virtual_has_wrap_arounds, version, n_cpus_per_chip,
+            with_monitors, down_chips, down_cores, down_links)

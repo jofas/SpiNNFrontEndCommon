@@ -1,6 +1,21 @@
 import requests
 
 
+def run(self, hbp_server_url, total_run_time):
+    max_machine = self._max_machine_request(hbp_server_url, total_run_time)
+
+    # Return the width and height and assume that it has wrap arounds
+    return max_machine["width"], max_machine["height"], True
+
+
+def _max_machine_request(url, total_run_time):
+    if url.endswith("/"):
+        url = url[:-1]
+    return requests.get(
+        "{}/max".format(url),
+        params={'runTime': total_run_time}).json()
+
+
 class HBPMaxMachineGenerator(object):
 
     """ Generates the width and height of the maximum machine a given\
@@ -16,15 +31,4 @@ class HBPMaxMachineGenerator(object):
                     the machine
         :param total_run_time: The total run time to request
         """
-
-        max_machine = self._max_machine_request(hbp_server_url, total_run_time)
-
-        # Return the width and height and assume that it has wrap arounds
-        return max_machine["width"], max_machine["height"], True
-
-    def _max_machine_request(self, url, total_run_time):
-        if url.endswith("/"):
-            url = url[:-1]
-        return requests.get(
-            "{}/max".format(url),
-            params={'runTime': total_run_time}).json()
+        run(hbp_server_url, total_run_time)

@@ -70,6 +70,32 @@ class _HBPJobController(Thread, AbstractMachineAllocationController):
             sys.exit(1)
 
 
+def run(hbp_server_url, total_run_time, n_chips):
+    url = hbp_server_url
+    if url.endswith("/"):
+        url = url[:-1]
+
+    machine = _get_machine(url, n_chips, total_run_time)
+    hbp_job_controller = _HBPJobController(url)
+    hbp_job_controller.start()
+
+    bmp_details = None
+    if "bmp_details" in machine:
+        bmp_details = machine["bmpDetails"]
+
+    return (
+        machine["machineName"], int(machine["version"]), None, None, None,
+        bmp_details, False, False, None, None, None,
+        hbp_job_controller
+    )
+
+
+def _get_machine(url, n_chips, total_run_time):
+    get_machine_request = requests.get(
+        url, params={"nChips": n_chips, "runTime": total_run_time})
+    return get_machine_request.json()
+
+
 class HBPAllocator(object):
     """ Request a machine from the HBP remote access server that will fit\
         a number of chips
@@ -84,26 +110,4 @@ class HBPAllocator(object):
         :param total_run_time: The total run time to request
         :param n_chips: The number of chips required
         """
-
-        url = hbp_server_url
-        if url.endswith("/"):
-            url = url[:-1]
-
-        machine = self._get_machine(url, n_chips, total_run_time)
-        hbp_job_controller = _HBPJobController(url)
-        hbp_job_controller.start()
-
-        bmp_details = None
-        if "bmp_details" in machine:
-            bmp_details = machine["bmpDetails"]
-
-        return (
-            machine["machineName"], int(machine["version"]), None, None,
-            bmp_details, False, False, None, None, None,
-            hbp_job_controller, None
-        )
-
-    def _get_machine(self, url, n_chips, total_run_time):
-        get_machine_request = requests.get(
-            url, params={"nChips": n_chips, "runTime": total_run_time})
-        return get_machine_request.json()
+        return run(hbp_server_url, total_run_time, n_chips)
