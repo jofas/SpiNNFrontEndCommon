@@ -97,6 +97,7 @@ void ConnectionBuilder::ParamGenerator::ConvKernel::Generate(
   uint16_t hlf_kw = m_kernelWidth  >> 1;
   uint16_t hlf_kh = m_kernelHeight >> 1;
   int16_t k_r, k_c;
+
   for(uint16_t i = 0; i < num_params; i++){
     uint16_t post_r, post_c; //post raw
     uint16_t pac_r, pac_c;// post as common

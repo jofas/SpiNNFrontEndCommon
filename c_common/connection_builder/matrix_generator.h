@@ -107,26 +107,28 @@ protected:
 
       if (*fixed_address == EMPTY_VAL && !skip_first){
         *fixed_address = new_fixed;
+//        LOG_PRINT(LOG_LEVEL_INFO, "\tinit-inserted %u in %u", new_fixed, 0);
 
         if(is_plastic){ plastic_address[plastic_step-1] = new_plastic; }
+
         return;
       }
       for(uint32_t i = 1; i < max_rows; i++){
         if ((fixed_address[i] == EMPTY_VAL) && \
-           (fixed_address[i - 1] & val_mask) < \
-           (new_fixed & val_mask)){
+            ((fixed_address[i - 1] & val_mask) < \
+            (new_fixed & val_mask))){
 
             fixed_address[i] = new_fixed;
 
             if(is_plastic){
               plastic_address[plastic_step*(i+1) - 1] = new_plastic;
             }
-//            LOG_PRINT(LOG_LEVEL_INFO, "\tinserted in %u", i);
+//            LOG_PRINT(LOG_LEVEL_INFO, "\tdirect inserted in %u", i);
             return;
         }
         else if ((fixed_address[i] == EMPTY_VAL) && \
-                 (fixed_address[i - 1] & val_mask) > \
-                 (new_fixed & val_mask)){
+                 ((fixed_address[i - 1] & val_mask) > \
+                  (new_fixed & val_mask))){
 
           fixed_address[i] = fixed_address[i - 1];
           fixed_address[i - 1] = new_fixed;
@@ -136,7 +138,7 @@ protected:
                                 plastic_address[plastic_step*i - 1];
             plastic_address[plastic_step*i - 1] = new_plastic;
           }
-//          LOG_PRINT(LOG_LEVEL_INFO, "\tinserted in %u", i);
+//          LOG_PRINT(LOG_LEVEL_INFO, "\tswap inserted in %u", i);
           return;
         }
         else if ((fixed_address[i - 1] & val_mask) > \
@@ -146,6 +148,7 @@ protected:
           if(is_plastic){
             swap(plastic_address[plastic_step*(i - 1)], new_plastic);
           }
+//          LOG_PRINT(LOG_LEVEL_INFO, "\tswapped %u <-> %u", i, i-1);
         }
       }
 
