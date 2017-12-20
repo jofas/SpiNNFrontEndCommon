@@ -83,7 +83,7 @@ uint32_t *g_SynapticMatrixBaseAddress = NULL;
 
 // Factories to create matrix, connector and parameter generators by ID
 GeneratorFactory<MatrixGenerator::Base, 2> g_MatrixGeneratorFactory;
-GeneratorFactory<ConnectorGenerator::Base, 5> g_ConnectorGeneratorFactory;
+GeneratorFactory<ConnectorGenerator::Base, 10> g_ConnectorGeneratorFactory;
 GeneratorFactory<ParamGenerator::Base, 10> g_ParamGeneratorFactory;
 
 // Memory buffers to placement new generators into
@@ -134,10 +134,11 @@ static void send_n_delays(uint32_t placement, uint16_t *delays, uint32_t n_delay
 
   uint16_t delay_chip = (uint16_t)_place_xy_16(placement);
   uint8_t delay_core  = (uint8_t)_place_p(placement);
-//#ifdef DEBUG_MESSAGES
+#ifdef DEBUG_MESSAGES
   LOG_PRINT(LOG_LEVEL_INFO,
             "send_n_delays to 0x%04x.%02u, N = %u",
             delay_chip, delay_core, n_delays);
+#endif
 //  for(uint32_t i = 0; i < n_delays; i++){
 //    LOG_PRINT(LOG_LEVEL_INFO,
 //              "\tpre = %u, delay = %u", _preid_delay_i(delays[i]),
@@ -186,9 +187,9 @@ static bool send_delays(const uint32_t num_placements, const uint32_t *placement
     if (n_delays == 0) {
         return true;
     }
-
+#ifdef DEBUG_MESSAGES
     LOG_PRINT(LOG_LEVEL_INFO, "In send delays");
-
+#endif
 
     uint16_t pairs_per_core[MAX_N_DELAYS_PER_PACKET];
 
@@ -292,8 +293,8 @@ static bool send_delays(const uint32_t num_placements, const uint32_t *placement
       count = 0;
 
       if(seen[place_idx]){
-        LOG_PRINT(LOG_LEVEL_INFO, "\t --- 0x%04x finished",
-                  placements[place_idx]);
+//        LOG_PRINT(LOG_LEVEL_INFO, "\t --- 0x%04x finished",
+//                  placements[place_idx]);
 
         send_n_delays(placements[place_idx], NULL, 0, rand_num, 0);
       }
@@ -372,8 +373,9 @@ bool ReadConnectionBuilderRegion(uint32_t **in_region,
   const uint32_t words_per_weight    = *region++;
   const uint32_t pre_slice_start     = *region++;
   const uint32_t pre_slice_count     = *region++;
-  const uint32_t is_direct_row       = *region++;
-  const uint32_t is_delayed          = *region++;
+  const uint32_t is_direct_row       = (*region >> 16) & 0xFFFF;
+  const uint32_t is_delayed          = (*region & 0xFFFF);
+  region++;
   const uint32_t num_delayed_places  = *region++;
 
   const uint32_t *delay_places_xyp   = region;
@@ -395,6 +397,8 @@ bool ReadConnectionBuilderRegion(uint32_t **in_region,
   // Create RNG with this seed for this matrix
   MarsKiss64 rng(seed);
 //#if LOG_LEVEL <= LOG_LEVEL_TRACE
+  LOG_PRINT(LOG_LEVEL_INFO, "\tpre slice (%u, %u of %u)",
+            pre_slice_start, pre_slice_start + pre_slice_count, num_pre_neurons);
 #ifdef DEBUG_MESSAGES
   LOG_PRINT(LOG_LEVEL_INFO, "\tconnector type hash:%u, delay type hash:%u, weight type hash:%u", connector_type_hash, delay_type_hash, weight_type_hash);
 
@@ -569,10 +573,8 @@ bool ReadSDRAMData(uint32_t *params_address, uint32_t *syn_mtx_addr){
             sark_heap_max(sv->sdram_heap, ALLOC_LOCK));
 #endif
 
-//#endif
-
-  LOG_PRINT(LOG_LEVEL_INFO, "idx/delay buffer size = %u bytes",
-            (MAX_PRE_DELAY_ENTRIES*256)*sizeof(uint16_t) );
+//  LOG_PRINT(LOG_LEVEL_INFO, "idx/delay buffer size = %u bytes",
+//            (MAX_PRE_DELAY_ENTRIES*256)*sizeof(uint16_t) );
 
 #if SARK_HEAP == 1
   pre_delay_pairs = (uint16_t *)sark_xalloc(sark.heap,
@@ -689,7 +691,7 @@ bool ReadSDRAMData(uint32_t *params_address, uint32_t *syn_mtx_addr){
   }
 
 
-  LOG_PRINT(LOG_LEVEL_INFO, "\n\n= = = = = =\n\n");
+  LOG_PRINT(LOG_LEVEL_INFO, "\n\n\n\n");
 #ifdef DEBUG_MESSAGES
   if((syn_mtx_addr[0] >> 2) < 81){
     LOG_PRINT(LOG_LEVEL_INFO, "synaptic matrix address = 0x%08x", syn_mtx_addr);
@@ -754,6 +756,7 @@ void app_start(uint a0, uint a1){
   REGISTER_FACTORY_CLASS("FixedProbabilityConnector", ConnectorGenerator,
                                                       FixedProbability);
   REGISTER_FACTORY_CLASS("KernelConnector", ConnectorGenerator, Kernel);
+  REGISTER_FACTORY_CLASS("CorticalConnector", ConnectorGenerator, Cortical);
   REGISTER_FACTORY_CLASS("MappingConnector", ConnectorGenerator, Mapping);
 
   // REGISTER_FACTORY_CLASS("FixedTotalNumberConnector", ConnectorGenerator, FixedTotalNumber);
@@ -766,7 +769,7 @@ void app_start(uint a0, uint a1){
   REGISTER_FACTORY_CLASS("normal",   ParamGenerator, Normal);
 //  REGISTER_FACTORY_CLASS("normal_clipped", ParamGenerator, NormalClipped);
 //  REGISTER_FACTORY_CLASS("normal_clipped_to_boundary", ParamGenerator, NormalClippedToBoundary);
-  REGISTER_FACTORY_CLASS("exponential", ParamGenerator, Exponential);
+//  REGISTER_FACTORY_CLASS("exponential", ParamGenerator, Exponential);
 
   // Allocate buffers for placement new from factories
   // **NOTE** we need to be able to simultaneously allocate a delay and
@@ -826,7 +829,7 @@ extern "C" void __cxa_pure_virtual()
 
 
 extern "C" void c_main(void){
-    LOG_PRINT(LOG_LEVEL_INFO, "%u bytes of free DTCM", sark_heap_max(sark.heap, 0));
+//    LOG_PRINT(LOG_LEVEL_INFO, "%u bytes of free DTCM", sark_heap_max(sark.heap, 0));
 
     // kick-start the process
     spin1_schedule_callback(app_start, 0, 0, 2);

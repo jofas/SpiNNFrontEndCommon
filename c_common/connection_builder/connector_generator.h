@@ -78,6 +78,50 @@ class Kernel : public Base{
 
 };
 
+
+class Cortical : public Base{
+  public:
+    ADD_FACTORY_CREATOR(Cortical);
+    virtual unsigned int Generate(uint32_t pre_start, uint32_t pre_count,
+                                uint32_t pre_idx,
+                                uint32_t post_start, uint32_t post_count,
+                                uint32_t max_indices,
+                                MarsKiss64 &rng, uint16_t (&indices)[512]);
+
+  private:
+    Cortical(uint32_t *&);
+    uint32_t m_probability;
+    uint16_t m_maxDistance;
+    uint16_t m_maxDistanceSquare;
+    uint8_t m_allowSelfConnections;
+
+    uint16_t m_prePerZone;
+    uint16_t m_postPerZone;
+
+    // shapes of 2d planes
+    uint16_t m_commonHeight;
+    uint16_t m_commonWidth;
+    uint16_t m_preHeight;
+    uint16_t m_preWidth;
+    uint16_t m_postHeight;
+    uint16_t m_postWidth;
+
+    //how we got the pre/post shapes from commonShape
+    //start offset from commonShape
+    uint16_t m_startPreHeight;
+    uint16_t m_startPreWidth;
+    uint16_t m_startPostHeight;
+    uint16_t m_startPostWidth;
+
+    //stepping with respect of commonShape
+    uint16_t  m_stepPreWidth;
+    uint16_t  m_stepPreHeight;
+    uint16_t  m_stepPostWidth;
+    uint16_t  m_stepPostHeight;
+
+};
+
+
 class Mapping : public Base{
   public:
     ADD_FACTORY_CREATOR(Mapping);

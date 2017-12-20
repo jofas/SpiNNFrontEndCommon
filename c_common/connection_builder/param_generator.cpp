@@ -57,7 +57,7 @@ ConnectionBuilder::ParamGenerator::ConvKernel::ConvKernel(uint32_t *&region){
     m_kernelHeight = (uint16_t)( (*region) & 0xFFFF );
     region++;
 
-    LOG_PRINT(LOG_LEVEL_INFO, "\t\t\tKernel parameter: ");
+    LOG_PRINT(LOG_LEVEL_INFO, "\t\t\tKernel (%u, %u)", m_kernelWidth, m_kernelHeight);
 //    LOG_PRINT(LOG_LEVEL_INFO, "\t\t\t\tpre(%d, %d) => post(%d, %d)",
 //              m_preWidth, m_preHeight, m_postWidth, m_postHeight);
 //    LOG_PRINT(LOG_LEVEL_INFO, "\t\t\t\tkernel(%d, %d), start(%d, %d), step(%d, %d)",
@@ -147,7 +147,7 @@ ConnectionBuilder::ParamGenerator::Constant::Constant(uint32_t *&region)
 {
   m_Value = *reinterpret_cast<int32_t*>(region++);
 
-  LOG_PRINT(LOG_LEVEL_INFO, "\t\t\tConstant parameter: value:%d", m_Value);
+  LOG_PRINT(LOG_LEVEL_INFO, "\t\t\tConstant: %d", m_Value);
 }
 //-----------------------------------------------------------------------------
 void ConnectionBuilder::ParamGenerator::Constant::Generate(
@@ -172,7 +172,7 @@ ConnectionBuilder::ParamGenerator::Uniform::Uniform(uint32_t *&region)
   const int32_t high = *reinterpret_cast<int32_t*>(region++);
   m_Range = high - m_Low;
 
-  LOG_PRINT(LOG_LEVEL_INFO, "\t\t\tUniform parameter: low:%d, high:%d, range:%d",
+  LOG_PRINT(LOG_LEVEL_INFO, "\t\t\tUniform: low:%d, high:%d, range:%d",
             m_Low, high, m_Range);
 }
 //-----------------------------------------------------------------------------
@@ -204,7 +204,7 @@ ConnectionBuilder::ParamGenerator::Normal::Normal(uint32_t *&region)
 {
   m_Mu = *reinterpret_cast<int32_t*>(region++);
   m_Sigma = *reinterpret_cast<int32_t*>(region++);
-  LOG_PRINT(LOG_LEVEL_INFO, "\t\t\tNormal parameter: mu:%d, sigma:%d",
+  LOG_PRINT(LOG_LEVEL_INFO, "\t\t\tNormal: mu:%d, sigma:%d",
             m_Mu, m_Sigma);
 }
 //-----------------------------------------------------------------------------
@@ -246,7 +246,7 @@ ConnectionBuilder::ParamGenerator::NormalClipped::NormalClipped(uint32_t *&regio
   m_High = std::max(low, high);
 
   LOG_PRINT(LOG_LEVEL_INFO,
-            "\t\t\tNormal clipped parameter: mu:%d, sigma:%d, low:%d, high:%d",
+            "\t\t\tNormal clipped: mu:%d, sigma:%d, low:%d, high:%d",
             m_Mu, m_Sigma, m_Low, m_High);
 }
 //-----------------------------------------------------------------------------
@@ -283,8 +283,8 @@ ConnectionBuilder::ParamGenerator::NormalClippedToBoundary::NormalClippedToBound
   m_Sigma = *reinterpret_cast<int32_t*>(region++);
   m_Low = *reinterpret_cast<int32_t*>(region++);
   m_High = *reinterpret_cast<int32_t*>(region++);
-  LOG_PRINT(LOG_LEVEL_INFO, "\t\t\tNormal clipped to boundary parameter:\
-                             mu:%d, sigma:%d, low:%d, high:%d",
+  LOG_PRINT(LOG_LEVEL_INFO,
+            "\t\t\tNormal clipped to boundary :mu:%d, sigma:%d, low:%d, high:%d",
             m_Mu, m_Sigma, m_Low, m_High);
 }
 //-----------------------------------------------------------------------------
@@ -322,7 +322,7 @@ ConnectionBuilder::ParamGenerator::Exponential::Exponential(uint32_t *&region)
 {
   m_Beta = *reinterpret_cast<int32_t*>(region++);
 
-  LOG_PRINT(LOG_LEVEL_INFO, "\t\t\tExponential parameter: beta:%d",
+  LOG_PRINT(LOG_LEVEL_INFO, "\t\t\tExponential: beta:%d",
             m_Beta);
 }
 //-----------------------------------------------------------------------------
