@@ -11,6 +11,7 @@
 #include <vector>
 #include <set>
 #include <ctime>
+#include <cstdint>
 #include <pybind11/pybind11.h>
 
 #include "SDPHeader.h"

@@ -22,6 +22,7 @@ typedef unsigned short ushort;
 #include <stdlib.h>
 #include <string.h>
 #include <iostream>
+#include <cstdint>
 
 using namespace std;
 
