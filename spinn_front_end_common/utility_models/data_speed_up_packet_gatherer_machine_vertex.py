@@ -19,6 +19,7 @@ from spinnman.exceptions import SpinnmanTimeoutException
 from spinnman.messages.sdp import SDPMessage, SDPHeader, SDPFlag
 from spinnman.connections.udp_packet_connections import SCAMPConnection
 
+import logging
 import math
 import time
 import struct
@@ -29,6 +30,7 @@ from spinn_front_end_common.utility_models.host_data_receiver import host_data_r
 from ctypes import *
 
 TIMEOUT_RETRY_LIMIT = 20
+logger = logging.getLogger(__name__)
 
 
 class DataSpeedUpPacketGatherMachineVertex(
@@ -350,7 +352,7 @@ class DataSpeedUpPacketGatherMachineVertex(
         :rtype: None
         """
         for seq_num in sorted(seq_nums):
-            print "from list i'm missing sequence num {}".format(seq_num)
+            logger.info("from list i'm missing sequence num %d", seq_num)
 
     def _print_out_packet_data(self, data):
         """ debug prints out the data from the packet
@@ -361,8 +363,8 @@ class DataSpeedUpPacketGatherMachineVertex(
         reread_data = struct.unpack("<{}I".format(
             int(math.ceil(len(data) / self.WORD_TO_BYTE_CONVERTER))),
             str(data))
-        print "converted data back into readable form is {}" \
-            .format(reread_data)
+        logger.info(
+            "converted data back into readable form is %d", reread_data)
 
     @staticmethod
     def _print_length_of_received_seq_nums(seq_nums, max_needed):
@@ -373,8 +375,9 @@ class DataSpeedUpPacketGatherMachineVertex(
         :rtype: None
         """
         if len(seq_nums) != max_needed:
-            print "should have received {} sequence numbers, but received " \
-                  "{} sequence numbers".format(max_needed, len(seq_nums))
+            logger.info(
+                "should have received %d sequence numbers, but received "
+                "%d sequence numbers", max_needed, len(seq_nums))
 
     @staticmethod
     def _print_packet_num_being_sent(packet_count, n_packets):
@@ -385,5 +388,6 @@ class DataSpeedUpPacketGatherMachineVertex(
         :param n_packets: how many packets to fire.
         :rtype: None
         """
-        print("send SDP packet with missing sequence numbers: {} of {}".format(
-            packet_count + 1, n_packets))
+        logger.info(
+            "send SDP packet with missing sequence numbers: %d of %d",
+            packet_count + 1, n_packets)
