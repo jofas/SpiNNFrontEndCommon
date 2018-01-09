@@ -57,7 +57,7 @@ int main(int argc, char *argv[])  {
     memory_address = atoi(argv[MEMORY_ADDRESS]);
     hostname = argv[HOSTNAME_POSITION];
     file_pathr = argv[FILE_PATH_READ_POSITION];
-    file_pathm = argv[FILE_PATH_READ_POSITION];
+    file_pathm = argv[FILE_PATH_MISS_POSITION];
     chip_x = atoi(argv[CHIP_X]);
     chip_y = atoi(argv[CHIP_Y]);
     iptag = atoi(argv[IPTAG]);

@@ -1,34 +1,36 @@
 #include "host_data_receiver.h"
 
 using namespace std;
-namespace py = pybind11;
+//namespace py = pybind11;
 
 //Constants
-		static const uint32_t SDP_PACKET_START_SENDING_COMMAND_ID = 100;
-		static const uint32_t SDP_PACKET_START_MISSING_SEQ_COMMAND_ID = 1000;
-		static const uint32_t SDP_PACKET_MISSING_SEQ_COMMAND_ID = 1001;
-		//static const int SDP_PACKET_PORT = 2;
-		static const uint32_t SDP_RETRANSMISSION_HEADER_SIZE = 10;
-		static const uint32_t SDP_PACKET_START_SENDING_COMMAND_MESSAGE_SIZE = 3;
+static const uint32_t SDP_PACKET_START_SENDING_COMMAND_ID = 100;
+static const uint32_t SDP_PACKET_START_MISSING_SEQ_COMMAND_ID = 1000;
+static const uint32_t SDP_PACKET_MISSING_SEQ_COMMAND_ID = 1001;
+//static const int SDP_PACKET_PORT = 2;
+static const uint32_t SDP_RETRANSMISSION_HEADER_SIZE = 10;
+static const uint32_t SDP_PACKET_START_SENDING_COMMAND_MESSAGE_SIZE = 3;
 
-		// time out constants
-		static const int TIMEOUT_PER_RECEIVE_IN_SECONDS = 1;
-		static const int TIMEOUT_PER_SENDING_IN_MICROSECONDS = 10000;
+// time out constants
+static const int TIMEOUT_PER_RECEIVE_IN_SECONDS = 1;
+static const int TIMEOUT_PER_SENDING_IN_MICROSECONDS = 10000;
 
-		// consts for data and converting between words and bytes
-		//static const int SDRAM_READING_SIZE_IN_BYTES_CONVERTER = 1024 * 1024;
-		static const int DATA_PER_FULL_PACKET = 68;
-		static const int DATA_PER_FULL_PACKET_WITH_SEQUENCE_NUM =
-	    	DATA_PER_FULL_PACKET - 1;
-		static const int WORD_TO_BYTE_CONVERTER = 4;
-		static const int LENGTH_OF_DATA_SIZE = 4;
-		static const int END_FLAG_SIZE = 4;
-		static const int END_FLAG_SIZE_IN_BYTES = 4;
-		static const int SEQUENCE_NUMBER_SIZE = 4;
-		static const int END_FLAG = 0xFFFFFFFF;
-		static const int LAST_MESSAGE_FLAG_BIT_MASK = 0x80000000;
-		static const int TIMEOUT_RETRY_LIMIT = 20;
+// consts for data and converting between words and bytes
+//static const int SDRAM_READING_SIZE_IN_BYTES_CONVERTER = 1024 * 1024;
+static const int DATA_PER_FULL_PACKET = 68;
+static const int DATA_PER_FULL_PACKET_WITH_SEQUENCE_NUM =
+	DATA_PER_FULL_PACKET - 1;
+static const int WORD_TO_BYTE_CONVERTER = 4;
+static const int LENGTH_OF_DATA_SIZE = 4;
+static const int END_FLAG_SIZE = 4;
+static const int END_FLAG_SIZE_IN_BYTES = 4;
+static const int SEQUENCE_NUMBER_SIZE = 4;
+static const int END_FLAG = 0xFFFFFFFF;
+static const int LAST_MESSAGE_FLAG_BIT_MASK = 0x80000000;
+static const int TIMEOUT_RETRY_LIMIT = 20;
 
+
+vector<uint32_t> missing;
 
 // Constructor
 host_data_receiver::host_data_receiver() {
@@ -120,7 +122,7 @@ bool host_data_receiver::retransmit_missing_sequences(
 			if(received_seq_nums->find(i) == received_seq_nums->end()) {
 
 				//missing is only used for statistical purposes
-				//missing.push_back(i);
+				missing.push_back(i);
 				missing_seq[j++] = i;
 			}
 		}
@@ -379,7 +381,7 @@ char * host_data_receiver::get_data(char *hostname, int port_connection, int pla
 	return buffer;
 }
 
-
+/*
 //Same behavior of get_data() function, but returns a valid type for python code
 py::bytes host_data_receiver::get_data_for_python(char *hostname, int port_connection, int placement_x, int placement_y, int placement_p,
 				int length_in_bytes, int memory_address, int chip_x, int chip_y, int iptag) {
@@ -433,11 +435,11 @@ py::bytes host_data_receiver::get_data_for_python(char *hostname, int port_conne
 				}
 				timeoutcount++;
 
-				/*delete sender;
+				//delete sender;
 
-				uint32_t loc_port = sender->get_local_port();
+				//uint32_t loc_port = sender->get_local_port();
 
-				sender = new UDPConnection(loc_port, NULL, 17893, hostname);*/
+				//sender = new UDPConnection(loc_port, NULL, 17893, hostname);
 
 				if(!finished) {
 
@@ -462,7 +464,7 @@ py::bytes host_data_receiver::get_data_for_python(char *hostname, int port_conne
 	std::string *str = new string((const char *)buffer, length_in_bytes);
 
 	return py::bytes(*str);
-}
+}*/
 
 
 // Function externally callable for data gathering. It can be called by multiple threads simultaneously
@@ -474,11 +476,21 @@ void host_data_receiver::get_data_threadable(char *hostname, int port_connection
 	char *buffer;
 
 	fp1 = fopen(filepath_read, "wb");
-	//fp2 = fopen(filepath_missing, "w"); //In alternative it can be opened as "a" and using mutexes all the missing seqs can be written into a single text file
+	fp2 = fopen(filepath_missing, "w");
 
 	buffer = get_data(hostname, port_connection, placement_x, placement_y, placement_p, length_in_bytes, memory_address, chip_x, chip_y, iptag);
 
 	fwrite(buffer, sizeof(char), length_in_bytes, fp1);
+
+	vector<uint32_t>::iterator i;
+	char *miss = new char[sizeof(uint32_t) * missing.size()];
+	int offset = 0;
+
+	for(i = missing.begin() ; i != missing.end() ; i++) {
+
+		uint32_t v = (uint32_t)*i;
+		fprintf(fp2, "%u\n", v);
+	}
 
 	/*uint32_t size = (uint32_t)missing.size();
 	char *miss = new char[((size + 1) * sizeof(uint32_t))];
@@ -486,13 +498,13 @@ void host_data_receiver::get_data_threadable(char *hostname, int port_connection
 	memcpy(miss, &size, sizeof(uint32_t));
 	memcpy(miss+sizeof(uint32_t), &missing, size*sizeof(uint32_t));*/
 
-	//fwrite(&miss, sizeof(char), size*sizeof(uint32_t), fp2);
+	//fwrite(miss, sizeof(char), size*sizeof(uint32_t), fp2);
 
 	fclose(fp1);
-	//fclose(fp2);
+	fclose(fp2);
 
 }
-
+/*
 //Python Binding
 
 PYBIND11_MODULE(host_data_receiver, m) {
@@ -505,3 +517,4 @@ PYBIND11_MODULE(host_data_receiver, m) {
 		.def("get_data", &host_data_receiver::get_data)
 		.def("get_data_for_python", &host_data_receiver::get_data_for_python);
 }
+*/

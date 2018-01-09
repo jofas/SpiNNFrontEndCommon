@@ -26,8 +26,10 @@ import struct
 from enum import Enum
 from pacman.executor.injection_decorator import inject_items
 
-from spinn_front_end_common.utility_models.host_data_receiver import host_data_receiver
-from ctypes import *
+#===============================================================================
+# from spinn_front_end_common.utility_models.host_data_receiver import host_data_receiver
+# from ctypes import *
+#===============================================================================
 
 TIMEOUT_RETRY_LIMIT = 20
 logger = logging.getLogger(__name__)
@@ -343,6 +345,12 @@ class DataSpeedUpPacketGatherMachineVertex(
 
 
         return bytearray(buf)
+
+    def get_iptag(self):
+        return self.tag
+
+    def get_port(self):
+        return constants.SDP_PORTS.EXTRA_MONITOR_CORE_DATA_SPEED_UP.value
 
     @staticmethod
     def _print_missing(seq_nums):

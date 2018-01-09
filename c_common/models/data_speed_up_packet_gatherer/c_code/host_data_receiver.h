@@ -12,7 +12,7 @@
 #include <set>
 #include <ctime>
 #include <cstdint>
-#include <pybind11/pybind11.h>
+//#include <pybind11/pybind11.h>
 
 #include "SDPHeader.h"
 #include "SDPMessage.h"
@@ -28,8 +28,8 @@ class host_data_receiver {
 		void get_data_threadable(char *hostname, int port_connection, int placement_x, int placement_y,
 								int placement_p, char *filepath_read, char *filepath_missing, int length_in_bytes,
 								int memory_address, int chip_x, int chip_y, int iptag);
-		pybind11::bytes get_data_for_python(char *hostname, int port_connection, int placement_x, int placement_y, int placement_p,
-				int length_in_bytes, int memory_address, int chip_x, int chip_y, int iptag);
+		//pybind11::bytes get_data_for_python(char *hostname, int port_connection, int placement_x, int placement_y, int placement_p,
+		//		int length_in_bytes, int memory_address, int chip_x, int chip_y, int iptag);
 
 	private:
 		char * build_scp_req(uint16_t cmd, uint32_t port, int iptag, int strip_sdp, uint32_t ip_address);

@@ -191,7 +191,7 @@ uint32_t UDPConnection::get_local_ip() {
 }
 
 UDPConnection::~UDPConnection() {
-    printf("Closing\n");
+
     shutdown(this->sock, SHUT_RDWR);
     close(this->sock);
 }
