@@ -30,7 +30,7 @@ static const int LAST_MESSAGE_FLAG_BIT_MASK = 0x80000000;
 static const int TIMEOUT_RETRY_LIMIT = 20;
 
 
-vector<uint32_t> missing;
+//vector<uint32_t> missing;
 
 // Constructor
 host_data_receiver::host_data_receiver() {
@@ -122,7 +122,7 @@ bool host_data_receiver::retransmit_missing_sequences(
 			if(received_seq_nums->find(i) == received_seq_nums->end()) {
 
 				//missing is only used for statistical purposes
-				missing.push_back(i);
+				//missing.push_back(i);
 				missing_seq[j++] = i;
 			}
 		}
@@ -476,13 +476,13 @@ void host_data_receiver::get_data_threadable(char *hostname, int port_connection
 	char *buffer;
 
 	fp1 = fopen(filepath_read, "wb");
-	fp2 = fopen(filepath_missing, "w");
+	//fp2 = fopen(filepath_missing, "w");
 
 	buffer = get_data(hostname, port_connection, placement_x, placement_y, placement_p, length_in_bytes, memory_address, chip_x, chip_y, iptag);
 
 	fwrite(buffer, sizeof(char), length_in_bytes, fp1);
 
-	vector<uint32_t>::iterator i;
+	/*vector<uint32_t>::iterator i;
 	char *miss = new char[sizeof(uint32_t) * missing.size()];
 	int offset = 0;
 
@@ -490,18 +490,10 @@ void host_data_receiver::get_data_threadable(char *hostname, int port_connection
 
 		uint32_t v = (uint32_t)*i;
 		fprintf(fp2, "%u\n", v);
-	}
-
-	/*uint32_t size = (uint32_t)missing.size();
-	char *miss = new char[((size + 1) * sizeof(uint32_t))];
-
-	memcpy(miss, &size, sizeof(uint32_t));
-	memcpy(miss+sizeof(uint32_t), &missing, size*sizeof(uint32_t));*/
-
-	//fwrite(miss, sizeof(char), size*sizeof(uint32_t), fp2);
+	}*/
 
 	fclose(fp1);
-	fclose(fp2);
+	//fclose(fp2);
 
 }
 /*
