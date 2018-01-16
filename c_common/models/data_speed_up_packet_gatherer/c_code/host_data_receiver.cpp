@@ -55,7 +55,7 @@ host_data_receiver::host_data_receiver(int port_connection, int placement_x, int
 
 	this->rdr.thrown = false;
 	this->pcr.thrown = false;
-	this->finished = false;
+	this->finished_transfer = false;
 }
 
 // Function for allocating an SCP Message
@@ -386,7 +386,7 @@ void host_data_receiver::processor_thread(UDPConnection *sender) {
 
 	// close socket and inform the reader that transmission is completed
 	delete sender;
-	this->finished = true;
+	this->finished_transfer = true;
 }
 
 // Function externally callable for data gathering. It returns a buffer containing read data
@@ -420,7 +420,7 @@ char * host_data_receiver::get_data() {
 			cout << this->pcr.val << endl;
 			return NULL;
 		} 
-		else if(this->rdr.thrown == true && this->finished == false) {
+		else if(this->rdr.thrown == true && this->finished_transfer == false) {
 
 			cout << this->rdr.val << endl;
 			return NULL;
