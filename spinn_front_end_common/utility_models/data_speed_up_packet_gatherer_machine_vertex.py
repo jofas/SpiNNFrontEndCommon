@@ -5,6 +5,7 @@ from pacman.model.graphs.common import EdgeTrafficType
 from pacman.model.graphs.machine import MachineVertex
 from pacman.model.resources import ResourceContainer, SDRAMResource, \
     IPtagResource
+from conda._vendor.toolz.itertoolz import sliding_window
 from spinn_front_end_common.abstract_models \
     import AbstractHasAssociatedBinary, AbstractGeneratesDataSpecification
 from spinn_front_end_common.interface.provenance import \
@@ -126,6 +127,8 @@ class DataSpeedUpPacketGatherMachineVertex(
         self._provenance_data_items = defaultdict(list)
 
         self.tag = None
+        self._sliding_window = None
+        self._window_size = None
 
     @property
     @overrides(MachineVertex.resources_required)
@@ -164,7 +167,7 @@ class DataSpeedUpPacketGatherMachineVertex(
         })
     def generate_data_specification(
             self, spec, placement, machine_graph, routing_info, tags,
-            machine_time_step, time_scale_factor):
+            machine_time_step, time_scale_factor, sliding_window, window_size):
 
         # Setup words + 1 for flags + 1 for recording size
         setup_size = constants.SYSTEM_BYTES_REQUIREMENT
@@ -193,6 +196,15 @@ class DataSpeedUpPacketGatherMachineVertex(
         spec.write_value(new_seq_key)
         spec.write_value(first_data_key)
         spec.write_value(end_flag_key)
+
+        # Data for windowed protocol
+        spec.write_value(sliding_window)
+        spec.write_value(window_size)
+
+        #Width of the sliding window
+        self._sliding_window = sliding_window
+        #Width of the shift
+        self._window_size = window_size
 
         # locate the tag id for our data and update with port
         iptags = tags.get_ip_tags_for_vertex(self)
@@ -329,6 +341,7 @@ class DataSpeedUpPacketGatherMachineVertex(
             data=None)
 
         connection = transceiver.scamp_connection_selector.get_next_connection(message)
+        #these two should be the coordinates of the ethernet chip
         chip_x = connection.chip_x
         chip_y = connection.chip_y
 
@@ -359,7 +372,9 @@ class DataSpeedUpPacketGatherMachineVertex(
                           str(memory_address),
                           str(chip_x),
                           str(chip_y),
-                          str(self.tag)])
+                          str(self.tag),
+                          str(self._window_size),
+                          str(self._sliding_window)])
 
         with open("./fileout.txt", "r") as fp:
             buf = fp.read()
@@ -372,6 +387,13 @@ class DataSpeedUpPacketGatherMachineVertex(
 
     def get_port(self):
         return constants.SDP_PORTS.EXTRA_MONITOR_CORE_DATA_SPEED_UP.value
+
+    def get_window_size(self):
+        return self._window_size
+
+    def get_sliding_window(self):
+        return self._sliding_window
+
 
     @staticmethod
     def _print_missing(seq_nums):
