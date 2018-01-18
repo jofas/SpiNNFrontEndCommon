@@ -17,6 +17,9 @@
 //! convert between words to bytes
 #define WORD_TO_BYTE_MULTIPLIER 4
 
+//! Code for ACK Packet
+#define ACK_CODE 0
+
 //! struct for a SDP message with pure data, no scp header
 typedef struct sdp_msg_pure_data {	// SDP message (=292 bytes)
     struct sdp_msg *next;	// Next in free list
@@ -36,6 +39,15 @@ typedef struct sdp_msg_pure_data {	// SDP message (=292 bytes)
 
     uint32_t _PAD;		// Private padding
 } sdp_msg_pure_data;
+
+//! struct for the elements of the circular buffer
+typedef struct buffer_elem {
+
+	uint32_t data[ITEMS_PER_DATA_PACKET]; // Single packet
+
+	uint size; // Size of the packet, necessary as it's not constant
+
+} buffer_elem;
 
 //! control value, which says how many timer ticks to run for before exiting
 static uint32_t simulation_ticks = 0;
@@ -61,6 +73,15 @@ static uint32_t position_in_store = 0;
 //! sdp message holder for transmissions
 sdp_msg_pure_data my_msg;
 
+//! Windowed protocol values
+static uint32_t window_size = 0;
+static uint32_t sliding_window = 0;
+static uint32_t start_pos = 0;
+static uint32_t end_pos = 0;
+static uint8_t ack_received = 0;
+
+//! Buffer containing all the packets of the window
+static buffer_elem *buffer;
 
 //! human readable definitions of each region in SDRAM
 typedef enum regions_e {
@@ -69,12 +90,12 @@ typedef enum regions_e {
 
 //! human readable definitions of the data in each region
 typedef enum config_elements {
-    NEW_SEQ_KEY, FIRST_DATA_KEY, END_FLAG_KEY, TAG_ID
+    NEW_SEQ_KEY, FIRST_DATA_KEY, END_FLAG_KEY, SLIDING_WINDOW, WINDOW_SIZE, TAG_ID
 } config_elements;
 
 //! values for the priority for each callback
 typedef enum callback_priorities{
-    MC_PACKET = -1, SDP = 0, DMA = 0
+    MC_PACKET = 0, SDP = -1, DMA = 0
 } callback_priorities;
 
 
@@ -86,11 +107,17 @@ void send_data(){
     //log_info("last element is %d", data[position_in_store - 1]);
     //log_info("first element is %d", data[0]);
 
+    int pos;
+
     spin1_memcpy(&my_msg.data, data,
 	    position_in_store * WORD_TO_BYTE_MULTIPLIER);
     my_msg.length =
 	    LENGTH_OF_SDP_HEADER + (position_in_store * WORD_TO_BYTE_MULTIPLIER);
     //log_info("my length is %d with position %d", my_msg.length, position_in_store);
+
+	//more efficient than the spin1_memcpy
+	memcpy(&(buffer[data[0]+start_pos]->data), data, position_in_store * WORD_TO_BYTE_MULTIPLIER);
+	buffer[data[0]+start_pos]->size = position_in_store * WORD_TO_BYTE_MULTIPLIER;
 
     if (seq_num > max_seq_num){
         log_error(
@@ -105,6 +132,57 @@ void send_data(){
     position_in_store = 1;
     seq_num += 1;
     data[0] = seq_num;
+}
+
+void re_send_window() {
+
+	int i;
+
+	if(end_pos > start_pos) {
+
+		for(i = start_pos; i <= end_pos && !ack_received; i++) {
+
+			memcpy(&my_msg.data, &(buffer[i]->data), buffer[i]->size);
+			my_msg.length = LENGTH_OF_SDP_HEADER + buffer[i]->size;
+
+			while(!spin1_send_sdp_msg((sdp_msg_t *) &my_msg, 100));
+		}
+	}
+	else {
+
+		for(i = start_pos; i < sliding_window && !ack_received; i++) {
+
+			memcpy(&my_msg.data, &(buffer[i]->data), buffer[i]->size);
+			my_msg.length = LENGTH_OF_SDP_HEADER + buffer[i]->size;
+
+			while(!spin1_send_sdp_msg((sdp_msg_t *) &my_msg, 100));
+		}
+
+		for(i = 0 ; i <= end_pos && !ack_received; i++) {
+
+			memcpy(&my_msg.data, &(buffer[i]->data), buffer[i]->size);
+			my_msg.length = LENGTH_OF_SDP_HEADER + buffer[i]->size;
+
+			while(!spin1_send_sdp_msg((sdp_msg_t *) &my_msg, 100));
+		}
+	}
+
+	ack_received = 0;
+}
+
+void receive_ack(uint mailbox, uint port) {
+
+	sdp_msg_pure_data *msg = (sdp_msg_pure_data *) mailbox;
+
+	if(msg->data[0] == ACK_CODE) {
+
+		start_pos = (start_pos + window_size) % sliding_window;
+		end_pos = (end_pos + window_size) % sliding_window;
+		ack_received = 1;
+	}
+
+	//Free the message
+	spin1_msg_free(msg);
 }
 
 void receive_data(uint key, uint payload) {
@@ -154,10 +232,20 @@ void receive_data(uint key, uint payload) {
             //log_info("last payload was %d", payload);
             send_data();
         }
+
+        // Window is terminated
+        while(seq_num > end_pos) {
+
+        	//No ACK received
+        	re_send_window();
+        }
+
+        ack_received = 0;
     }
 }
 
 static bool initialize(uint32_t *timer_period) {
+
     log_info("Initialise: started\n");
 
     // Get the address this core's DTCM data starts at from SRAM
@@ -181,6 +269,17 @@ static bool initialize(uint32_t *timer_period) {
     new_sequence_key = config_address[NEW_SEQ_KEY];
     first_data_key = config_address[FIRST_DATA_KEY];
     end_flag_key = config_address[END_FLAG_KEY];
+
+    sliding_window = config_address[SLIDING_WINDOW];
+    window_size = config_address[WINDOW_SIZE];
+    end_pos = sliding_window - 1;
+    ack_received = 0;
+
+    // Allocate the circular buffer containing all the packets of the current window
+    if((buffer = (buffer_elem *) sark_alloc(sliding_window, sizeof(buffer_elem))) == NULL) {
+		log_error("failed to allocate the packet buffer in DTCM");
+    	return false;
+    }
 
     my_msg.tag = config_address[TAG_ID];	// IPTag 1
     my_msg.dest_port = PORT_ETH;		// Ethernet
@@ -217,6 +316,7 @@ void c_main() {
     }
 
     spin1_callback_on(FRPL_PACKET_RECEIVED, receive_data, MC_PACKET);
+    spin1_callback_on(SDP_PACKET_RX, receive_ack, SDP);
 
     // start execution
     log_info("Starting\n");

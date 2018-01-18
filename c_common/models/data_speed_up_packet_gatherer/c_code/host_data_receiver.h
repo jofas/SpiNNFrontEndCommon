@@ -25,7 +25,8 @@ class host_data_receiver {
 
 	public:
 		host_data_receiver(int port_connection, int placement_x, int placement_y, int placement_p,
-						   char *hostname, int length_in_bytes, int memory_address, int chip_x, int chip_y, int iptag);
+						   char *hostname, int length_in_bytes, int memory_address, int chip_x,
+						   int chip_y, int iptag, uint32_t window_size, uint32_t sliding_window);
 		char * get_data();
 		void get_data_threadable(char *filepath_read, char *filepath_missing);
 		//pybind11::bytes get_data_for_python(char *hostname, int port_connection, int placement_x, int placement_y, int placement_p,
@@ -37,10 +38,13 @@ class host_data_receiver {
         bool retransmit_missing_sequences(UDPConnection *sender, set<uint32_t> *received_seq_nums);
         uint32_t calculate_max_seq_num(uint32_t length);
         bool check(set<uint32_t> *received_seq_nums, uint32_t max_needed);
-        void process_data(UDPConnection *sender, bool *finished, set<uint32_t> *received_seq_nums, char *recvdata, int datalen);
+        void process_data(UDPConnection *sender, bool *finished, set<uint32_t> *received_seq_nums,
+        	char *recvdata, int datalen, uint32_t *received_seqs, set<uint32_t> **received_in_windows);
         void reader_thread(UDPConnection *receiver);
         void processor_thread(UDPConnection *sender);
+        void send_ack(UDPConnection *sender);
 
+        //Type for the Parallel Queue
         typedef struct packet{
 
 			char content[400];
@@ -72,6 +76,10 @@ class host_data_receiver {
 		thexc rdr;
 		thexc pcr;
 		bool finished_transfer;
+		uint32_t window_size;
+		uint32_t sliding_window;
+		uint32_t window_start;
+		uint32_t window_end;
 
 
 };

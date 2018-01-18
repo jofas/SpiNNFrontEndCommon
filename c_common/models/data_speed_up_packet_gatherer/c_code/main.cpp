@@ -3,7 +3,7 @@
 int main(int argc, char *argv[])  {
 
     // constants for arguments
-    static const int N_ARGS = 13;
+    static const int N_ARGS = 15;
     static const int IP_ADDRESS_SIZE = 24;
     static const int FILE_PATH_SIZE = 1024;
 
@@ -20,7 +20,9 @@ int main(int argc, char *argv[])  {
 		MEMORY_ADDRESS = 9,
 		CHIP_X = 10,
 		CHIP_Y = 11,
-		IPTAG = 12};
+		IPTAG = 12,
+        WINDOW_SIZE = 13,
+    	SLIDING_WINDOW = 14};
 
     // variables
     int i;
@@ -39,6 +41,8 @@ int main(int argc, char *argv[])  {
     int chip_x = 0;
     int chip_y = 0;
     int iptag = 0;
+    uint32_t window_size = 0;
+    uint32_t sliding_window = 0;
 
 
 
@@ -61,9 +65,11 @@ int main(int argc, char *argv[])  {
     chip_x = atoi(argv[CHIP_X]);
     chip_y = atoi(argv[CHIP_Y]);
     iptag = atoi(argv[IPTAG]);
+    window_size = (uint32_t)atoi(argv[WINDOW_SIZE]);
+    sliding_window = (uint32_t)atoi(argv[SLIDING_WINDOW]);
 
     host_data_receiver collector(port_connection, placement_x, placement_y, placement_p, hostname,
-                    length_in_bytes, memory_address, chip_x, chip_y, iptag);
+                    length_in_bytes, memory_address, chip_x, chip_y, iptag, window_size, sliding_window);
 
     collector.get_data_threadable(file_pathr, file_pathm);
 
