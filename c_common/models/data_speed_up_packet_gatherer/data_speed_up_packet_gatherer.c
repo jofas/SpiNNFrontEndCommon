@@ -78,7 +78,9 @@ static uint32_t window_size = 0;
 static uint32_t sliding_window = 0;
 static uint32_t start_pos = 0;
 static uint32_t end_pos = 0;
-static uint8_t ack_received = 0;
+static uint32_t seq_with_no_ack = 0;
+static uint32_t act_window = 0;
+static uint32_t index = 0; 
 
 //! Buffer containing all the packets of the window
 static buffer_elem *buffer;
@@ -95,7 +97,7 @@ typedef enum config_elements {
 
 //! values for the priority for each callback
 typedef enum callback_priorities{
-    MC_PACKET = 0, SDP = -1, DMA = 0
+    MC_PACKET = 0, SDP = -1, DMA = 2
 } callback_priorities;
 
 
@@ -107,7 +109,9 @@ void send_data(){
     //log_info("last element is %d", data[position_in_store - 1]);
     //log_info("first element is %d", data[0]);
 
-    int pos;
+    int index;
+
+    log_info("sending\n");
 
     spin1_memcpy(&my_msg.data, data,
 	    position_in_store * WORD_TO_BYTE_MULTIPLIER);
@@ -115,9 +119,10 @@ void send_data(){
 	    LENGTH_OF_SDP_HEADER + (position_in_store * WORD_TO_BYTE_MULTIPLIER);
     //log_info("my length is %d with position %d", my_msg.length, position_in_store);
 
-	//more efficient than the spin1_memcpy
-	memcpy(&(buffer[data[0]+start_pos]->data), data, position_in_store * WORD_TO_BYTE_MULTIPLIER);
-	buffer[data[0]+start_pos]->size = position_in_store * WORD_TO_BYTE_MULTIPLIER;
+	//cannot use the memcpy because stdlib cannot be included
+	spin1_memcpy(&(buffer[index].data), data, position_in_store * WORD_TO_BYTE_MULTIPLIER);
+	buffer[index].size = position_in_store * WORD_TO_BYTE_MULTIPLIER;
+	index = (index + 1) % sliding_window;
 
     if (seq_num > max_seq_num){
         log_error(
@@ -129,6 +134,14 @@ void send_data(){
 	// Empty body
     }
 
+    seq_with_no_ack++;
+
+    log_info("sent SDP\n");
+
+    if(seq_num == max_seq_num) {
+    	//MANCA DA GESTIRE IL CASO FINALE
+    }
+
     position_in_store = 1;
     seq_num += 1;
     data[0] = seq_num;
@@ -136,57 +149,71 @@ void send_data(){
 
 void re_send_window() {
 
-	int i;
+	uint32_t i;
 
 	if(end_pos > start_pos) {
 
-		for(i = start_pos; i <= end_pos && !ack_received; i++) {
+		for(i = start_pos; i <= end_pos && seq_with_no_ack >= sliding_window; i++) {
 
-			memcpy(&my_msg.data, &(buffer[i]->data), buffer[i]->size);
-			my_msg.length = LENGTH_OF_SDP_HEADER + buffer[i]->size;
+			spin1_memcpy(&my_msg.data, &(buffer[i].data), buffer[i].size);
+			my_msg.length = LENGTH_OF_SDP_HEADER + buffer[i].size;
 
 			while(!spin1_send_sdp_msg((sdp_msg_t *) &my_msg, 100));
 		}
 	}
 	else {
 
-		for(i = start_pos; i < sliding_window && !ack_received; i++) {
+		for(i = start_pos; i < sliding_window && seq_with_no_ack >= sliding_window; i++) {
 
-			memcpy(&my_msg.data, &(buffer[i]->data), buffer[i]->size);
-			my_msg.length = LENGTH_OF_SDP_HEADER + buffer[i]->size;
+			spin1_memcpy(&my_msg.data, &(buffer[i].data), buffer[i].size);
+			my_msg.length = LENGTH_OF_SDP_HEADER + buffer[i].size;
 
 			while(!spin1_send_sdp_msg((sdp_msg_t *) &my_msg, 100));
 		}
 
-		for(i = 0 ; i <= end_pos && !ack_received; i++) {
+		for(i = 0 ; i <= end_pos && seq_with_no_ack >= sliding_window; i++) {
 
-			memcpy(&my_msg.data, &(buffer[i]->data), buffer[i]->size);
-			my_msg.length = LENGTH_OF_SDP_HEADER + buffer[i]->size;
+			spin1_memcpy(&my_msg.data, &(buffer[i].data), buffer[i].size);
+			my_msg.length = LENGTH_OF_SDP_HEADER + buffer[i].size;
 
 			while(!spin1_send_sdp_msg((sdp_msg_t *) &my_msg, 100));
 		}
 	}
-
-	ack_received = 0;
 }
 
 void receive_ack(uint mailbox, uint port) {
 
+	use(port);
+
+	log_info("Received ACK\n");
+
 	sdp_msg_pure_data *msg = (sdp_msg_pure_data *) mailbox;
 
-	if(msg->data[0] == ACK_CODE) {
+	if(msg->data[0] == ACK_CODE && msg->data[1] == act_window) {
 
 		start_pos = (start_pos + window_size) % sliding_window;
 		end_pos = (end_pos + window_size) % sliding_window;
-		ack_received = 1;
+		seq_with_no_ack -= window_size;
+		act_window++;
 	}
 
 	//Free the message
-	spin1_msg_free(msg);
+	spin1_msg_free((sdp_msg_t *) msg);
 }
 
 void receive_data(uint key, uint payload) {
-    //log_info("packet!");
+
+	int cpsr;
+
+	cpsr = cpu_irq_enable();
+
+	// Window is terminated
+    while(seq_with_no_ack >= sliding_window) {
+
+		//No ACK received
+    	re_send_window();
+    }
+
     if (key == new_sequence_key) {
         if (position_in_store != 1) {
             send_data();
@@ -232,16 +259,8 @@ void receive_data(uint key, uint payload) {
             //log_info("last payload was %d", payload);
             send_data();
         }
-
-        // Window is terminated
-        while(seq_num > end_pos) {
-
-        	//No ACK received
-        	re_send_window();
-        }
-
-        ack_received = 0;
     }
+        cpu_int_restore(cpsr);
 }
 
 static bool initialize(uint32_t *timer_period) {
@@ -273,7 +292,10 @@ static bool initialize(uint32_t *timer_period) {
     sliding_window = config_address[SLIDING_WINDOW];
     window_size = config_address[WINDOW_SIZE];
     end_pos = sliding_window - 1;
-    ack_received = 0;
+    seq_with_no_ack = 0;
+    index = 0;
+
+    log_info("params: %d, %d", sliding_window, window_size);
 
     // Allocate the circular buffer containing all the packets of the current window
     if((buffer = (buffer_elem *) sark_alloc(sliding_window, sizeof(buffer_elem))) == NULL) {
@@ -316,7 +338,8 @@ void c_main() {
     }
 
     spin1_callback_on(FRPL_PACKET_RECEIVED, receive_data, MC_PACKET);
-    spin1_callback_on(SDP_PACKET_RX, receive_ack, SDP);
+   //spin1_callback_on(SDP_PACKET_RX, receive_ack, SDP);
+    simulation_sdp_callback_on(1, receive_ack);
 
     // start execution
     log_info("Starting\n");

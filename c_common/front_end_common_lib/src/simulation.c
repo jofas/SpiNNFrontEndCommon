@@ -291,9 +291,11 @@ bool simulation_initialise(
     pointer_to_simulation_time = simulation_ticks_pointer;
     pointer_to_infinite_run = infinite_run_pointer;
 
+    log_info("Setting up SDP to %d", sdp_packet_callback_priority);
     spin1_callback_on(
         SDP_PACKET_RX, _simulation_sdp_callback_handler,
         sdp_packet_callback_priority);
+    log_info("SDP Done");
     simulation_sdp_callback_on(
         address[SIMULATION_CONTROL_SDP_PORT],
         _simulation_control_scp_callback);

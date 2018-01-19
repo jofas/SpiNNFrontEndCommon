@@ -52,7 +52,7 @@ class DataSpeedUpPacketGatherMachineVertex(
                ('CONFIG', 1)])
 
     # size of config region in bytes
-    CONFIG_SIZE = 16
+    CONFIG_SIZE = 24
 
     # items of data a SDP packet can hold when SCP header removed
     DATA_PER_FULL_PACKET = 68  # 272 bytes as removed SCP header
@@ -127,8 +127,10 @@ class DataSpeedUpPacketGatherMachineVertex(
         self._provenance_data_items = defaultdict(list)
 
         self.tag = None
-        self._sliding_window = None
+        self._sliding_window_c = None
         self._window_size = None
+
+        self._placement = None
 
     @property
     @overrides(MachineVertex.resources_required)
@@ -167,7 +169,7 @@ class DataSpeedUpPacketGatherMachineVertex(
         })
     def generate_data_specification(
             self, spec, placement, machine_graph, routing_info, tags,
-            machine_time_step, time_scale_factor, sliding_window, window_size):
+            machine_time_step, time_scale_factor):
 
         # Setup words + 1 for flags + 1 for recording size
         setup_size = constants.SYSTEM_BYTES_REQUIREMENT
@@ -198,13 +200,15 @@ class DataSpeedUpPacketGatherMachineVertex(
         spec.write_value(end_flag_key)
 
         # Data for windowed protocol
-        spec.write_value(sliding_window)
-        spec.write_value(window_size)
+        spec.write_value(3)
+        spec.write_value(1)
 
         #Width of the sliding window
-        self._sliding_window = sliding_window
+        self._sliding_window_c = 3
         #Width of the shift
-        self._window_size = window_size
+        self._window_size = 1
+
+        self._placement = placement
 
         # locate the tag id for our data and update with port
         iptags = tags.get_ip_tags_for_vertex(self)
@@ -344,6 +348,7 @@ class DataSpeedUpPacketGatherMachineVertex(
         #these two should be the coordinates of the ethernet chip
         chip_x = connection.chip_x
         chip_y = connection.chip_y
+        chip_p = self._placement.p
 
 
         #=======================================================================
@@ -372,9 +377,10 @@ class DataSpeedUpPacketGatherMachineVertex(
                           str(memory_address),
                           str(chip_x),
                           str(chip_y),
+                          str(chip_p),
                           str(self.tag),
                           str(self._window_size),
-                          str(self._sliding_window)])
+                          str(self._sliding_window_c)])
 
         with open("./fileout.txt", "r") as fp:
             buf = fp.read()
@@ -392,7 +398,7 @@ class DataSpeedUpPacketGatherMachineVertex(
         return self._window_size
 
     def get_sliding_window(self):
-        return self._sliding_window
+        return self._sliding_window_c
 
 
     @staticmethod

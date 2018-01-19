@@ -26,7 +26,7 @@ class host_data_receiver {
 	public:
 		host_data_receiver(int port_connection, int placement_x, int placement_y, int placement_p,
 						   char *hostname, int length_in_bytes, int memory_address, int chip_x,
-						   int chip_y, int iptag, uint32_t window_size, uint32_t sliding_window);
+						   int chip_y, int chip_p, int iptag, uint32_t window_size, uint32_t sliding_window);
 		char * get_data();
 		void get_data_threadable(char *filepath_read, char *filepath_missing);
 		//pybind11::bytes get_data_for_python(char *hostname, int port_connection, int placement_x, int placement_y, int placement_p,
@@ -69,6 +69,7 @@ class host_data_receiver {
 		uint32_t memory_address;
 		int chip_x;
 		int chip_y;
+		int chip_p;
 		int iptag;
 		PQueue<packet> *messqueue;
 		char *buffer;

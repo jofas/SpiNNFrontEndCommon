@@ -34,7 +34,7 @@ static const int TIMEOUT_RETRY_LIMIT = 20;
 
 // Constructor
 host_data_receiver::host_data_receiver(int port_connection, int placement_x, int placement_y, int placement_p,
-		char *hostname, int length_in_bytes, int memory_address, int chip_x, int chip_y, int iptag, uint32_t window_size, uint32_t sliding_window) {
+		char *hostname, int length_in_bytes, int memory_address, int chip_x, int chip_y, int chip_p, int iptag, uint32_t window_size, uint32_t sliding_window) {
 
 	this->port_connection = port_connection; 
 	this->placement_x = placement_x; 
@@ -45,6 +45,7 @@ host_data_receiver::host_data_receiver(int port_connection, int placement_x, int
 	this->memory_address = (uint32_t)memory_address;
 	this->chip_x = chip_x;
 	this->chip_y = chip_y;
+	this->chip_p = chip_p;
 	this->iptag = iptag;
 
 	//ack size
@@ -159,18 +160,21 @@ bool host_data_receiver::check(set<uint32_t> *received_seq_nums, uint32_t max_ne
 	return true;
 }
 
-void host_data_receiver::send_ack(UDPConnection *sender) {
+void host_data_receiver::send_ack(UDPConnection *sender, uint32_t window) {
 
-	char data_field[sizeof(uint32_t)];
+	char data_field[2*sizeof(uint32_t)];
 
 	//Used char array in order to modify it for selective ACK or for greater message
 	memcpy(data_field, &ACK_MESSAGE_CODE, sizeof(uint32_t));
+	memcpy(data_field+sizeof(uint32_t), &window, sizeof(uint32_t));
+
+	cout << "SENDING ACK TO " << this->chip_x << this->chip_y << this->chip_p << endl;
 
 	// build SDP message to be sent to the ETHERNET CHIP!
     SDPMessage message = SDPMessage(
-        this->chip_x, this->chip_y, 0, 0,
+        this->chip_x, this->chip_y, this->chip_p, 0,
         SDPMessage::REPLY_NOT_EXPECTED, 255, 255,
-        255, 0, 0, data_field, sizeof(uint32_t));
+        255, 0, 0, data_field, 2*sizeof(uint32_t));
 
     //Send ACK
     sender->send_data(message.convert_to_byte_array(), message.length_in_bytes());
@@ -186,6 +190,8 @@ void host_data_receiver::process_data(UDPConnection *sender, bool *finished,
 	uint32_t last_mc_packet, first_packet_element, offset, true_data_length, seq_num;
 	bool is_end_of_stream;
 
+	cout << "IN PROCESS DATA" << endl;
+
 	//Data size of the packet
 	length_of_data = datalen;
 
@@ -193,9 +199,11 @@ void host_data_receiver::process_data(UDPConnection *sender, bool *finished,
 
 	seq_num = first_packet_element & 0x7FFFFFFF;
 
+	cout << "RECEIVED" << seq_num << endl;
+
 	//If received seq is lower than the window discard it as it has already been received
 	//window check is performed in any case to be sure to shift the window
-	if(seq_num > window_start) {
+	if(seq_num >= window_start) {
 
 		is_end_of_stream = ((first_packet_element & LAST_MESSAGE_FLAG_BIT_MASK) != 0) ? true : false;
 
@@ -217,8 +225,12 @@ void host_data_receiver::process_data(UDPConnection *sender, bool *finished,
 			memcpy(buffer+offset, recvdata+SEQUENCE_NUMBER_SIZE, (true_data_length-offset));
 		}
 
+		cout << "PROCESSING SEQUENCE NUMBER "  << seq_num << endl;
+
 		received_seq_nums->insert(seq_num);
+
 		received_in_windows[seq_num/this->window_size]->insert(seq_num);
+
 		(*received_seqs)++;
 
 		//Check for transmission termination
@@ -239,22 +251,39 @@ void host_data_receiver::process_data(UDPConnection *sender, bool *finished,
 				return;
 			}
 		}
-	}
 
-	//Check if it is possible to shift the window
-	if(*received_seqs >= this->window_size) {
+		//Check if it is possible to shift the window
+		if(*received_seqs >= this->window_size) {
 
-		if(check(received_in_windows[this->window_start/this->window_size], this->window_size-1)) {
+			cout << "CHECKING IF WINDOW " << seq_num/this->window_size << " IS COMPLETE" << endl;
 
-			send_ack(sender);
+			if(check(received_in_windows[this->window_start/this->window_size], this->window_size-1)) {
 
-			//Add check to not overcome max_seq_num boundary!!
-			this->window_start += this->window_size;
-			this->window_end += this->window_size;
+				send_ack(sender, this->window_start/this->window_size);
+
+				cout << "WINDOW COMPLETE, ACK SENT" << endl;
+
+				//Add check to not overcome max_seq_num boundary!!
+				this->window_start += this->window_size;
+				this->window_end += this->window_size;
+
+				cout << "NEW WINDOW: " << this->window_start << " " << this->window_end << endl;
+
+				sleep(10);
+
+			}
 
 		}
-
 	}
+	else {
+		//In case ACK has not been received
+		cout << "RESENDING ACK" << endl;
+		send_ack(sender, seq_num/this->window_size);		
+	}
+
+	cout << "RECEIVED " << *received_seqs << " SEQUENCES" << endl;
+
+	cout << "RETURNING FROM PROCESS DATA" << endl;
 
 }
 
@@ -300,6 +329,11 @@ void host_data_receiver::processor_thread(UDPConnection *sender) {
 	set<uint32_t> **received_in_windows = new set<uint32_t> *[(int)ceil((float)this->max_seq_num/(float)(this->window_size))];
 	packet p;
 	uint32_t received_seqs = 0;
+
+	for(int i = 0 ; i < (int)ceil((float)this->max_seq_num/(float)(this->window_size)) ; i++)
+		received_in_windows[i] = new set<uint32_t>;
+
+	cout << "STRUCT ALLOCATED" << endl;
 
 	while(!finished) {
 
@@ -356,6 +390,8 @@ char * host_data_receiver::get_data() {
 		// send the initial command to start data transmission
 		send_initial_command(sender, sender);
 
+		cout << "max_seq_num: " << this->max_seq_num << " window size: " << this->window_size << " sliding window " << this->sliding_window << endl;
+
 		thread reader(&host_data_receiver::reader_thread, this, sender);
 		thread processor(&host_data_receiver::processor_thread, this, sender);
 
@@ -402,6 +438,8 @@ void host_data_receiver::get_data_threadable(char *filepath_read, char *filepath
 	FILE *fp1, *fp2;
 
 	get_data();
+
+	cout << "WRITING ON FILE" << endl;
 
 	fp1 = fopen(filepath_read, "wb");
 	//fp2 = fopen(filepath_missing, "w");
