@@ -105,11 +105,48 @@ void resume_callback() {
     time = UINT32_MAX;
 }
 
+void re_send_window(uint32_t start, uint32_t end, uint32_t window) {
+
+    uint32_t i;
+
+    if(window > 0) {
+
+        if(end > start) {
+
+            for(i = start; i <= end && seq_with_no_ack >= window; i++) {
+
+                spin1_memcpy(&my_msg.data, &(buffer[i].data), buffer[i].size);
+                my_msg.length = LENGTH_OF_SDP_HEADER + buffer[i].size;
+
+                while(!spin1_send_sdp_msg((sdp_msg_t *) &my_msg, 100));
+            }
+        }
+        else {
+
+            for(i = start; i < window && seq_with_no_ack >= window; i++) {
+
+                spin1_memcpy(&my_msg.data, &(buffer[i].data), buffer[i].size);
+                my_msg.length = LENGTH_OF_SDP_HEADER + buffer[i].size;
+
+                while(!spin1_send_sdp_msg((sdp_msg_t *) &my_msg, 100));
+            }
+
+            for(i = 0 ; i <= end && seq_with_no_ack >= window; i++) {
+
+                spin1_memcpy(&my_msg.data, &(buffer[i].data), buffer[i].size);
+                my_msg.length = LENGTH_OF_SDP_HEADER + buffer[i].size;
+
+                while(!spin1_send_sdp_msg((sdp_msg_t *) &my_msg, 100));
+            }
+        }
+    }
+}
+
 void send_data(){
     //log_info("last element is %d", data[position_in_store - 1]);
     //log_info("first element is %d", data[0]);
 
-    int index;
+    uint32_t end;
 
     log_info("sending\n");
 
@@ -122,6 +159,7 @@ void send_data(){
 	//cannot use the memcpy because stdlib cannot be included
 	spin1_memcpy(&(buffer[index].data), data, position_in_store * WORD_TO_BYTE_MULTIPLIER);
 	buffer[index].size = position_in_store * WORD_TO_BYTE_MULTIPLIER;
+    end = index;
 	index = (index + 1) % sliding_window;
 
     if (seq_num > max_seq_num){
@@ -139,46 +177,16 @@ void send_data(){
     log_info("sent SDP\n");
 
     if(seq_num == max_seq_num) {
-    	//MANCA DA GESTIRE IL CASO FINALE
+
+        while(seq_with_no_ack > 0) {
+            
+            re_send_window(start_pos, end, seq_with_no_ack);
+        }
     }
 
     position_in_store = 1;
     seq_num += 1;
     data[0] = seq_num;
-}
-
-void re_send_window() {
-
-	uint32_t i;
-
-	if(end_pos > start_pos) {
-
-		for(i = start_pos; i <= end_pos && seq_with_no_ack >= sliding_window; i++) {
-
-			spin1_memcpy(&my_msg.data, &(buffer[i].data), buffer[i].size);
-			my_msg.length = LENGTH_OF_SDP_HEADER + buffer[i].size;
-
-			while(!spin1_send_sdp_msg((sdp_msg_t *) &my_msg, 100));
-		}
-	}
-	else {
-
-		for(i = start_pos; i < sliding_window && seq_with_no_ack >= sliding_window; i++) {
-
-			spin1_memcpy(&my_msg.data, &(buffer[i].data), buffer[i].size);
-			my_msg.length = LENGTH_OF_SDP_HEADER + buffer[i].size;
-
-			while(!spin1_send_sdp_msg((sdp_msg_t *) &my_msg, 100));
-		}
-
-		for(i = 0 ; i <= end_pos && seq_with_no_ack >= sliding_window; i++) {
-
-			spin1_memcpy(&my_msg.data, &(buffer[i].data), buffer[i].size);
-			my_msg.length = LENGTH_OF_SDP_HEADER + buffer[i].size;
-
-			while(!spin1_send_sdp_msg((sdp_msg_t *) &my_msg, 100));
-		}
-	}
 }
 
 void receive_ack(uint mailbox, uint port) {
@@ -211,7 +219,7 @@ void receive_data(uint key, uint payload) {
     while(seq_with_no_ack >= sliding_window) {
 
 		//No ACK received
-    	re_send_window();
+    	re_send_window(start_pos, end_pos, sliding_window);
     }
 
     if (key == new_sequence_key) {
@@ -223,6 +231,7 @@ void receive_data(uint key, uint payload) {
         data[0] = payload;
         seq_num = payload;
         position_in_store = 1;
+
 
         if (payload > max_seq_num){
             log_error(
@@ -242,6 +251,10 @@ void receive_data(uint key, uint payload) {
             data[0] = seq_num;
             position_in_store = 1;
             max_seq_num = payload;
+            start_pos = 0;
+            end_pos = sliding_window - 1;
+            seq_with_no_ack = 0;
+            index = 0;
         }
 
         if (key == end_flag_key){
@@ -250,6 +263,9 @@ void receive_data(uint key, uint payload) {
 
             // adjust size as last payload not counted
             position_in_store = position_in_store - 1;
+
+            //Send_data call with no sequences, just end flag (INSTRUCTION NECESSARY?)
+            seq_with_no_ack--;
 
             //log_info("position = %d with seq num %d", position_in_store, seq_num);
             //log_info("last payload was %d", payload);

@@ -42,7 +42,7 @@ class host_data_receiver {
         	char *recvdata, int datalen, uint32_t *received_seqs, set<uint32_t> **received_in_windows);
         void reader_thread(UDPConnection *receiver);
         void processor_thread(UDPConnection *sender);
-        void send_ack(UDPConnection *sender);
+        void send_ack(UDPConnection *sender, uint32_t window);
 
         //Type for the Parallel Queue
         typedef struct packet{

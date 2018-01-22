@@ -242,12 +242,14 @@ void host_data_receiver::process_data(UDPConnection *sender, bool *finished,
 				if(this->window_start >= this->max_seq_num) {
 
 					*finished = true;
+					send_ack(sender, this->window_start/this->window_size);
 					return;
 				}
 			}
 			else {
 
 				*finished = true;
+				send_ack(sender, this->window_start/this->window_size);
 				return;
 			}
 		}
