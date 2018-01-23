@@ -81,6 +81,8 @@ class host_data_receiver {
 		uint32_t sliding_window;
 		uint32_t window_start;
 		uint32_t window_end;
+		bool is_last;
+		uint32_t last_seq;
 
 
 };

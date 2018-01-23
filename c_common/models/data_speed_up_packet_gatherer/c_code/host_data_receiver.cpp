@@ -28,7 +28,7 @@ static const int END_FLAG_SIZE_IN_BYTES = 4;
 static const int SEQUENCE_NUMBER_SIZE = 4;
 static const int END_FLAG = 0xFFFFFFFF;
 static const int LAST_MESSAGE_FLAG_BIT_MASK = 0x80000000;
-static const int TIMEOUT_RETRY_LIMIT = 20;
+static const int TIMEOUT_RETRY_LIMIT = 1;
 
 //vector<uint32_t> missing;
 
@@ -59,6 +59,7 @@ host_data_receiver::host_data_receiver(int port_connection, int placement_x, int
 	this->buffer = new char[length_in_bytes];
 
 	this->max_seq_num = calculate_max_seq_num(length_in_bytes);
+	this->last_seq = this->max_seq_num;
 
 	this->rdr.thrown = false;
 	this->pcr.thrown = false;
@@ -66,6 +67,7 @@ host_data_receiver::host_data_receiver(int port_connection, int placement_x, int
 	this->finished_transfer = false;
 	this->window_start = 0;
 	this->window_end = this->window_size-1;
+	this->is_last = false;
 }
 
 // Function for allocating an SCP Message
@@ -138,7 +140,9 @@ uint32_t host_data_receiver::calculate_max_seq_num(uint32_t length) {
 
 	extra_n_sequences = (float)length / (float)(DATA_PER_FULL_PACKET_WITH_SEQUENCE_NUM * WORD_TO_BYTE_CONVERTER);
 
-	n_sequence_number += ceil(extra_n_sequences);
+	//n_sequence_number += ceil(extra_n_sequences);
+	//ERA QUELLO COMMENTATO PRIMA
+	n_sequence_number += extra_n_sequences;
 
 	return (uint32_t)n_sequence_number;
 }
@@ -172,7 +176,7 @@ void host_data_receiver::send_ack(UDPConnection *sender, uint32_t window) {
 
 	// build SDP message to be sent to the ETHERNET CHIP!
     SDPMessage message = SDPMessage(
-        this->chip_x, this->chip_y, this->chip_p, 0,
+        this->chip_x, this->chip_y, this->chip_p, 1,
         SDPMessage::REPLY_NOT_EXPECTED, 255, 255,
         255, 0, 0, data_field, 2*sizeof(uint32_t));
 
@@ -199,7 +203,7 @@ void host_data_receiver::process_data(UDPConnection *sender, bool *finished,
 
 	seq_num = first_packet_element & 0x7FFFFFFF;
 
-	cout << "RECEIVED" << seq_num << endl;
+	cout << "RECEIVED " << seq_num << endl;
 
 	//If received seq is lower than the window discard it as it has already been received
 	//window check is performed in any case to be sure to shift the window
@@ -236,20 +240,38 @@ void host_data_receiver::process_data(UDPConnection *sender, bool *finished,
 		//Check for transmission termination
 		if(is_end_of_stream) {
 
+			cout << "END OF STREAM" << endl;
+
+			cout << "WINDOW START " << this->window_start << " MAX SEQ NUM " << this->max_seq_num << endl;
+
+			//Got end of stream but received less than max_seq_num seqs, check if something is missing
 			if(!check(received_seq_nums, this->max_seq_num)) {
 
-				//Should correspond to checking that missing_seqs is empty
-				if(this->window_start >= this->max_seq_num) {
+				//If this is last window
+				if(this->window_end >= seq_num) {
 
-					*finished = true;
-					send_ack(sender, this->window_start/this->window_size);
-					return;
+					this->is_last = true;
+					this->last_seq = seq_num;
+
+					cout << "LAST WINDOW, NUMBER OF SEQUENCES HERE: " << (this->last_seq + 1) - this->window_start << endl;
+					
+					//If all sequences in last window have been received
+					if(check(received_in_windows[this->window_start/this->window_size], ((seq_num + 1) - this->window_start) - 1)) {
+
+						*finished = true;
+						send_ack(sender, this->window_start/this->window_size);
+
+						cout << "SENT LAST ACK" << endl;
+						return;
+					}
 				}
 			}
 			else {
 
 				*finished = true;
 				send_ack(sender, this->window_start/this->window_size);
+
+				cout << "SENT LAST ACK" << endl;
 				return;
 			}
 		}
@@ -259,7 +281,22 @@ void host_data_receiver::process_data(UDPConnection *sender, bool *finished,
 
 			cout << "CHECKING IF WINDOW " << seq_num/this->window_size << " IS COMPLETE" << endl;
 
-			if(check(received_in_windows[this->window_start/this->window_size], this->window_size-1)) {
+			//If last window
+			if(this->is_last) {
+
+				cout << "LAST WINDOW, NUMBER OF SEQUENCES HERE: " << (this->last_seq + 1) - this->window_start << " RCVD IN SET " << received_in_windows[this->window_start/this->window_size]->size() << endl;
+
+				//If all sequences in last window have been received
+				if(check(received_in_windows[this->window_start/this->window_size], ((this->last_seq + 1) - this->window_start) - 1)) {
+
+					*finished = true;
+					send_ack(sender, this->window_start/this->window_size);
+
+					cout << "SENT LAST ACK" << endl;
+					return;
+				}
+			}
+			else if(check(received_in_windows[this->window_start/this->window_size], this->window_size-1)) {
 
 				send_ack(sender, this->window_start/this->window_size);
 
@@ -270,9 +307,6 @@ void host_data_receiver::process_data(UDPConnection *sender, bool *finished,
 				this->window_end += this->window_size;
 
 				cout << "NEW WINDOW: " << this->window_start << " " << this->window_end << endl;
-
-				sleep(10);
-
 			}
 
 		}
@@ -282,8 +316,6 @@ void host_data_receiver::process_data(UDPConnection *sender, bool *finished,
 		cout << "RESENDING ACK" << endl;
 		send_ack(sender, seq_num/this->window_size);		
 	}
-
-	cout << "RECEIVED " << *received_seqs << " SEQUENCES" << endl;
 
 	cout << "RETURNING FROM PROCESS DATA" << endl;
 
@@ -356,6 +388,9 @@ void host_data_receiver::processor_thread(UDPConnection *sender) {
 
 				this->pcr.thrown = true;
 				this->pcr.val = "Failed to hear from the machine. Please try removing firewalls";
+				//Verify
+				delete sender;
+				return;
 
 			}
 
@@ -399,6 +434,8 @@ char * host_data_receiver::get_data() {
 
 		reader.join();
 		processor.join();
+
+		sleep(1);
 
 		if(this->pcr.thrown == true) {
 

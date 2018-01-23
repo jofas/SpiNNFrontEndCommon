@@ -38,8 +38,8 @@ class ExecutableType(Enum):
 
     SYSTEM = (
         4,
-        [CPUState.RUNNING],
-        [CPUState.RUNNING],
+        [CPUState.RUNNING, CPUState.PAUSED],
+        [CPUState.RUNNING, CPUState.PAUSED],
         True,
         "Runs immediately without waiting for barrier and never ends"
     )

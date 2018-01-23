@@ -20,6 +20,8 @@
 //! Code for ACK Packet
 #define ACK_CODE 0
 
+#define MAX_RETRIES 200
+
 //! struct for a SDP message with pure data, no scp header
 typedef struct sdp_msg_pure_data {	// SDP message (=292 bytes)
     struct sdp_msg *next;	// Next in free list
@@ -80,7 +82,12 @@ static uint32_t start_pos = 0;
 static uint32_t end_pos = 0;
 static uint32_t seq_with_no_ack = 0;
 static uint32_t act_window = 0;
-static uint32_t index = 0; 
+static uint32_t index = 0;
+
+//! Variables for timer
+static uint32_t start;
+static uint32_t end;
+static uint32_t window;
 
 //! Buffer containing all the packets of the window
 static buffer_elem *buffer;
@@ -105,7 +112,7 @@ void resume_callback() {
     time = UINT32_MAX;
 }
 
-void re_send_window(uint32_t start, uint32_t end, uint32_t window) {
+void re_send_window() {
 
     uint32_t i;
 
@@ -142,11 +149,19 @@ void re_send_window(uint32_t start, uint32_t end, uint32_t window) {
     }
 }
 
+void timer_callback(uint time, uint unused) {
+
+    use(time);
+    use(unused);
+
+	re_send_window();
+}
+
 void send_data(){
     //log_info("last element is %d", data[position_in_store - 1]);
     //log_info("first element is %d", data[0]);
 
-    uint32_t end;
+    uint32_t end_tmp;
 
     log_info("sending\n");
 
@@ -159,7 +174,7 @@ void send_data(){
 	//cannot use the memcpy because stdlib cannot be included
 	spin1_memcpy(&(buffer[index].data), data, position_in_store * WORD_TO_BYTE_MULTIPLIER);
 	buffer[index].size = position_in_store * WORD_TO_BYTE_MULTIPLIER;
-    end = index;
+    end_tmp = index;
 	index = (index + 1) % sliding_window;
 
     if (seq_num > max_seq_num){
@@ -174,13 +189,26 @@ void send_data(){
 
     seq_with_no_ack++;
 
-    log_info("sent SDP\n");
+    log_info("sent SDP seq %u\n", data[0]);
+    log_info("MAX SEQ NUM: %u\n", max_seq_num);
 
-    if(seq_num == max_seq_num) {
+    if(data[0] >= max_seq_num) {
+
+        log_info("SENT LAST SEQUENCE!!!!!!!!!!!!!!!!!!!!!!!!!\n");
 
         while(seq_with_no_ack > 0) {
-            
-            re_send_window(start_pos, end, seq_with_no_ack);
+
+                log_info("waiting for ack for last sliding window\n");
+                log_info("window number %d\n", act_window);
+
+        		start = start_pos;
+        		end = end_tmp;
+        		window = seq_with_no_ack;
+
+        		spin1_resume(SYNC_NOWAIT);
+        		spin1_wfi();
+            //re_send_window();
+        		spin1_pause();
         }
     }
 
@@ -193,7 +221,7 @@ void receive_ack(uint mailbox, uint port) {
 
 	use(port);
 
-	log_info("Received ACK\n");
+	log_info("Received ACK for window %u\n", act_window);
 
 	sdp_msg_pure_data *msg = (sdp_msg_pure_data *) mailbox;
 
@@ -212,14 +240,28 @@ void receive_ack(uint mailbox, uint port) {
 void receive_data(uint key, uint payload) {
 
 	int cpsr;
+    int i = 0;
 
 	cpsr = cpu_irq_enable();
 
 	// Window is terminated
-    while(seq_with_no_ack >= sliding_window) {
+    while(seq_with_no_ack >= sliding_window && i < MAX_RETRIES) {
 
+        log_info("Waiting for ACK\n");
 		//No ACK received
-    	re_send_window(start_pos, end_pos, sliding_window);
+        start = start_pos;
+        end = end_pos;
+        window = sliding_window;
+        spin1_resume(SYNC_NOWAIT);
+        //re_send_window(start_pos, end_pos, sliding_window);
+        spin1_wfi();
+        i++;
+        spin1_pause();
+    }
+    if(i >= MAX_RETRIES) {
+
+        log_error("MAX RETRIES REACHED\n");
+        rt_error(RTE_SWERR);
     }
 
     if (key == new_sequence_key) {
@@ -259,13 +301,15 @@ void receive_data(uint key, uint payload) {
 
         if (key == end_flag_key){
             // set end flag bit in seq num
+
+            log_info("END_FLAG_KEY!!!!!! %d\n", data[0]);
             data[0] = data[0] + (1 << 31);
 
             // adjust size as last payload not counted
             position_in_store = position_in_store - 1;
 
             //Send_data call with no sequences, just end flag (INSTRUCTION NECESSARY?)
-            seq_with_no_ack--;
+            //seq_with_no_ack--;
 
             //log_info("position = %d with seq num %d", position_in_store, seq_num);
             //log_info("last payload was %d", payload);
@@ -353,7 +397,10 @@ void c_main() {
         rt_error(RTE_SWERR);
     }
 
+    spin1_set_timer_tick(timer_period);
+
     spin1_callback_on(FRPL_PACKET_RECEIVED, receive_data, MC_PACKET);
+    spin1_callback_on(TIMER_TICK, timer_callback, 0);
    //spin1_callback_on(SDP_PACKET_RX, receive_ack, SDP);
     simulation_sdp_callback_on(1, receive_ack);
 
@@ -363,5 +410,5 @@ void c_main() {
     // Start the time at "-1" so that the first tick will be 0
     time = UINT32_MAX;
 
-    spin1_start(SYNC_NOWAIT);
+    spin1_start_paused();
 }
