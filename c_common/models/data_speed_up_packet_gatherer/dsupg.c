@@ -20,7 +20,7 @@
 //! Code for ACK Packet
 #define ACK_CODE 0
 
-#define MAX_RETRIES 200
+#define MAX_RETRIES 30
 
 //! struct for a SDP message with pure data, no scp header
 typedef struct sdp_msg_pure_data {	// SDP message (=292 bytes)
@@ -83,6 +83,7 @@ static uint32_t end_pos = 0;
 static uint32_t seq_with_no_ack = 0;
 static uint32_t act_window = 0;
 static uint32_t index = 0;
+static uint8_t received_reset = 0;
 
 //! Variables for timer
 static uint32_t start;
@@ -162,8 +163,9 @@ void send_data(){
     //log_info("first element is %d", data[0]);
 
     uint32_t end_tmp;
+    int i = 0;
 
-    log_info("sending\n");
+    //io_printf(IO_BUF, "sending\n");
 
     spin1_memcpy(&my_msg.data, data,
 	    position_in_store * WORD_TO_BYTE_MULTIPLIER);
@@ -189,17 +191,17 @@ void send_data(){
 
     seq_with_no_ack++;
 
-    log_info("sent SDP seq %u\n", data[0]);
-    log_info("MAX SEQ NUM: %u\n", max_seq_num);
+    io_printf(IO_BUF, "sent SDP seq %u\n", data[0]);
+    //io_printf(IO_BUF, "MAX SEQ NUM: %u\n", max_seq_num);
 
     if(data[0] >= max_seq_num) {
 
-        log_info("SENT LAST SEQUENCE!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+        //io_printf(IO_BUF, "SENT LAST SEQUENCE!!\n");
 
-        while(seq_with_no_ack > 0) {
+        while(seq_with_no_ack > 0 && i < MAX_RETRIES) {
 
-                log_info("waiting for ack for last sliding window\n");
-                log_info("window number %d\n", act_window);
+                //io_printf(IO_BUF, "waiting for ack for last sliding window\n");
+                //io_printf(IO_BUF, "window number %d, seq_with_no_ack %d\n", act_window, seq_with_no_ack);
 
         		start = start_pos;
         		end = end_tmp;
@@ -209,6 +211,12 @@ void send_data(){
         		spin1_wfi();
             //re_send_window();
         		spin1_pause();
+        		i++;
+        }
+        if(i >= MAX_RETRIES) {
+
+        log_error("MAX RETRIES REACHED\n");
+        rt_error(RTE_SWERR);
         }
     }
 
@@ -221,9 +229,11 @@ void receive_ack(uint mailbox, uint port) {
 
 	use(port);
 
-	log_info("Received ACK for window %u\n", act_window);
+	//io_printf(IO_BUF, "Received ACK, actual window %u, ", act_window);
 
 	sdp_msg_pure_data *msg = (sdp_msg_pure_data *) mailbox;
+
+    //io_printf(IO_BUF, "GOT : ACK CODE %u, WINDOW %u\n", msg->data[0], msg->data[1]);
 
 	if(msg->data[0] == ACK_CODE && msg->data[1] == act_window) {
 
@@ -237,6 +247,30 @@ void receive_ack(uint mailbox, uint port) {
 	spin1_msg_free((sdp_msg_t *) msg);
 }
 
+/*void receive_reset(uint mailbox, uint port) {
+
+	uint8_t payload;
+
+	use(port);
+
+	if(msg->data[0] == 1) {
+
+		io_printf(IO_BUF, "RECEIVED RESET\n");
+
+		payload = 0;
+		spin1_memcpy(&my_msg.data, payload, 1);
+		my_msg.length = 1;
+
+		while (!spin1_send_sdp_msg((sdp_msg_t *) &my_msg, 100));
+
+		received_reset = 1;
+		start_pos = 0;
+		end_pos = sliding_window - 1;
+		seq_with_no_ack = 0;
+		index = 0;
+	}
+}*/
+
 void receive_data(uint key, uint payload) {
 
 	int cpsr;
@@ -247,13 +281,12 @@ void receive_data(uint key, uint payload) {
 	// Window is terminated
     while(seq_with_no_ack >= sliding_window && i < MAX_RETRIES) {
 
-        log_info("Waiting for ACK\n");
+        //io_printf(IO_BUF, "Waiting for ACK for window %d\n", act_window);
 		//No ACK received
         start = start_pos;
         end = end_pos;
         window = sliding_window;
         spin1_resume(SYNC_NOWAIT);
-        //re_send_window(start_pos, end_pos, sliding_window);
         spin1_wfi();
         i++;
         spin1_pause();
@@ -268,8 +301,8 @@ void receive_data(uint key, uint payload) {
         if (position_in_store != 1) {
             send_data();
         }
-        //log_info("finding new seq num %d", payload);
-        //log_info("position in store is %d", position_in_store);
+        log_info("finding new seq num %d", payload);
+        log_info("position in store is %d", position_in_store);
         data[0] = payload;
         seq_num = payload;
         position_in_store = 1;
@@ -288,21 +321,18 @@ void receive_data(uint key, uint payload) {
         //log_info("payload is %d", payload);
 
         if (key == first_data_key) {
-            //log_info("resetting seq and position");
+            log_info("resetting seq and position");
             seq_num = FIRST_SEQ_NUM;
             data[0] = seq_num;
             position_in_store = 1;
             max_seq_num = payload;
-            start_pos = 0;
-            end_pos = sliding_window - 1;
-            seq_with_no_ack = 0;
-            index = 0;
+            received_reset = 0;
         }
 
         if (key == end_flag_key){
             // set end flag bit in seq num
 
-            log_info("END_FLAG_KEY!!!!!! %d\n", data[0]);
+            //io_printf(IO_BUF, "END_FLAG_KEY! %d\n", data[0]);
             data[0] = data[0] + (1 << 31);
 
             // adjust size as last payload not counted
@@ -311,11 +341,11 @@ void receive_data(uint key, uint payload) {
             //Send_data call with no sequences, just end flag (INSTRUCTION NECESSARY?)
             //seq_with_no_ack--;
 
-            //log_info("position = %d with seq num %d", position_in_store, seq_num);
+            log_info("position = %d with seq num %d", position_in_store, seq_num);
             //log_info("last payload was %d", payload);
             send_data();
         } else if (position_in_store == ITEMS_PER_DATA_PACKET) {
-            //log_info("position = %d with seq num %d", position_in_store, seq_num);
+            log_info("position = %d with seq num %d", position_in_store, seq_num);
             //log_info("last payload was %d", payload);
             send_data();
         }
@@ -325,7 +355,7 @@ void receive_data(uint key, uint payload) {
 
 static bool initialize(uint32_t *timer_period) {
 
-    log_info("Initialise: started\n");
+    //io_printf(IO_BUF, "Initialize: started\n");
 
     // Get the address this core's DTCM data starts at from SRAM
     address_t address = data_specification_get_data_address();
@@ -354,8 +384,9 @@ static bool initialize(uint32_t *timer_period) {
     end_pos = sliding_window - 1;
     seq_with_no_ack = 0;
     index = 0;
+    received_reset = 0;
 
-    log_info("params: %d, %d", sliding_window, window_size);
+    //io_printf(IO_BUF, "params: %d, %d", sliding_window, window_size);
 
     // Allocate the circular buffer containing all the packets of the current window
     if((buffer = (buffer_elem *) sark_alloc(sliding_window, sizeof(buffer_elem))) == NULL) {
@@ -387,7 +418,7 @@ static bool initialize(uint32_t *timer_period) {
  * SOURCE
  */
 void c_main() {
-    log_info("starting packet gatherer\n");
+    //io_printf(IO_BUF, "starting packet gatherer\n");
 
     // Load DTCM data
     uint32_t timer_period;
@@ -403,12 +434,15 @@ void c_main() {
     spin1_callback_on(TIMER_TICK, timer_callback, 0);
    //spin1_callback_on(SDP_PACKET_RX, receive_ack, SDP);
     simulation_sdp_callback_on(1, receive_ack);
+    //simulation_sdp_callback_on(2, receive_reset);
 
     // start execution
-    log_info("Starting\n");
+    //io_printf(IO_BUF, "Starting\n");
 
     // Start the time at "-1" so that the first tick will be 0
     time = UINT32_MAX;
 
     spin1_start_paused();
+
+    //io_printf(IO_BUF, "MAIN TERMINATES\n");
 }

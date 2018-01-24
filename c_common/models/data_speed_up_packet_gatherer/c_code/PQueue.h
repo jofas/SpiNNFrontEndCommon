@@ -26,7 +26,7 @@ class PQueue {
 
     while (queue_.empty()){
 
-      if((cond_.wait_for(mlock, 100ms)) == cv_status::timeout)
+      if((cond_.wait_for(mlock, 10*100ms)) == cv_status::timeout)
         throw TimeoutQueueException();
     }
 

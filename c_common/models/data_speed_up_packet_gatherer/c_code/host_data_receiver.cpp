@@ -28,7 +28,7 @@ static const int END_FLAG_SIZE_IN_BYTES = 4;
 static const int SEQUENCE_NUMBER_SIZE = 4;
 static const int END_FLAG = 0xFFFFFFFF;
 static const int LAST_MESSAGE_FLAG_BIT_MASK = 0x80000000;
-static const int TIMEOUT_RETRY_LIMIT = 1;
+static const int TIMEOUT_RETRY_LIMIT = 10;
 
 //vector<uint32_t> missing;
 
@@ -172,7 +172,7 @@ void host_data_receiver::send_ack(UDPConnection *sender, uint32_t window) {
 	memcpy(data_field, &ACK_MESSAGE_CODE, sizeof(uint32_t));
 	memcpy(data_field+sizeof(uint32_t), &window, sizeof(uint32_t));
 
-	cout << "SENDING ACK TO " << this->chip_x << this->chip_y << this->chip_p << endl;
+	cout << "SENDING ACK TO " << this->chip_x << this->chip_y << this->chip_p << " FOR WINDOW " << window << endl;
 
 	// build SDP message to be sent to the ETHERNET CHIP!
     SDPMessage message = SDPMessage(
@@ -231,11 +231,13 @@ void host_data_receiver::process_data(UDPConnection *sender, bool *finished,
 
 		cout << "PROCESSING SEQUENCE NUMBER "  << seq_num << endl;
 
+		//ELIMINA QUI!!!!!!!!!
+		if(received_seq_nums->find(seq_num) == received_seq_nums->end())
+			(*received_seqs)++;
+
 		received_seq_nums->insert(seq_num);
 
 		received_in_windows[seq_num/this->window_size]->insert(seq_num);
-
-		(*received_seqs)++;
 
 		//Check for transmission termination
 		if(is_end_of_stream) {
@@ -253,7 +255,7 @@ void host_data_receiver::process_data(UDPConnection *sender, bool *finished,
 					this->is_last = true;
 					this->last_seq = seq_num;
 
-					cout << "LAST WINDOW, NUMBER OF SEQUENCES HERE: " << (this->last_seq + 1) - this->window_start << endl;
+					cout << "LAST WINDOW, NUMBER OF SEQUENCES HERE: " << (this->last_seq + 1) - this->window_start << " RCVD IN SET " << received_in_windows[this->window_start/this->window_size]->size() << endl;
 					
 					//If all sequences in last window have been received
 					if(check(received_in_windows[this->window_start/this->window_size], ((seq_num + 1) - this->window_start) - 1)) {
@@ -261,7 +263,7 @@ void host_data_receiver::process_data(UDPConnection *sender, bool *finished,
 						*finished = true;
 						send_ack(sender, this->window_start/this->window_size);
 
-						cout << "SENT LAST ACK" << endl;
+						cout << "SENT LAST ACK, RETURNING FROM PROCESS DATA, RECEIVED " << (*received_seqs) << " SEQ NUMS!!!!" << endl;
 						return;
 					}
 				}
@@ -271,7 +273,8 @@ void host_data_receiver::process_data(UDPConnection *sender, bool *finished,
 				*finished = true;
 				send_ack(sender, this->window_start/this->window_size);
 
-				cout << "SENT LAST ACK" << endl;
+				cout << "SENT LAST ACK, RETURNING FROM PROCESS DATA, RECEIVED " << (*received_seqs) << " SEQ NUMS!!!!" << endl;
+
 				return;
 			}
 		}
@@ -292,7 +295,7 @@ void host_data_receiver::process_data(UDPConnection *sender, bool *finished,
 					*finished = true;
 					send_ack(sender, this->window_start/this->window_size);
 
-					cout << "SENT LAST ACK" << endl;
+					cout << "SENT LAST ACK, RETURNING FROM PROCESS DATA, RECEIVED " << (*received_seqs) << " SEQ NUMS!!!!" << endl;
 					return;
 				}
 			}
@@ -317,7 +320,7 @@ void host_data_receiver::process_data(UDPConnection *sender, bool *finished,
 		send_ack(sender, seq_num/this->window_size);		
 	}
 
-	cout << "RETURNING FROM PROCESS DATA" << endl;
+	cout << "RETURNING FROM PROCESS DATA, RECEIVED " << (*received_seqs) << " SEQ NUMS!!!!" << endl;
 
 }
 
