@@ -181,7 +181,7 @@ class DataSpeedUpPacketGatherMachineVertex(
         # write data for the simulation data item
         spec.switch_write_focus(self.DATA_REGIONS.SYSTEM.value)
         spec.write_array(simulation_utilities.get_simulation_header_array(
-            self.get_binary_file_name(), 3000, 1)) #HERE TIMEOUT FOR THE C CODE
+            self.get_binary_file_name(), 3000000, 1)) #HERE TIMEOUT FOR THE C CODE
 
         # the keys for the special cases
         if self.TRAFFIC_TYPE == EdgeTrafficType.MULTICAST:
@@ -199,14 +199,14 @@ class DataSpeedUpPacketGatherMachineVertex(
         spec.write_value(first_data_key)
         spec.write_value(end_flag_key)
 
-        # Data for windowed protocol
-        spec.write_value(10)
-        spec.write_value(3)
-
         #Width of the sliding window
-        self._sliding_window_c = 10
+        self._sliding_window_c = 50
         #Width of the shift
-        self._window_size = 3
+        self._window_size = 10
+
+        # Data for windowed protocol
+        spec.write_value(self._sliding_window_c)
+        spec.write_value(self._window_size)
 
         self._placement = placement
 
@@ -294,6 +294,10 @@ class DataSpeedUpPacketGatherMachineVertex(
         extra_monitor_cores_for_router_timeout[0].set_router_time_outs(
             15, 15, transceiver, placements,
             extra_monitor_cores_for_router_timeout)
+        extra_monitor_cores_for_router_timeout[0].set_reinjection_router_emergency_timeout(
+            1, 1, transceiver, placements,
+            extra_monitor_cores_for_router_timeout)
+
 
     @staticmethod
     def unset_cores_for_data_extraction(
@@ -301,6 +305,9 @@ class DataSpeedUpPacketGatherMachineVertex(
             placements):
         extra_monitor_cores_for_router_timeout[0].set_router_time_outs(
             15, 4, transceiver, placements,
+            extra_monitor_cores_for_router_timeout)
+        extra_monitor_cores_for_router_timeout[0].set_reinjection_router_emergency_timeout(
+            0, 0, transceiver, placements,
             extra_monitor_cores_for_router_timeout)
 
     def get_data(
@@ -384,7 +391,6 @@ class DataSpeedUpPacketGatherMachineVertex(
 
         with open("./fileout.txt", "r") as fp:
             buf = fp.read()
-
 
         return bytearray(buf)
 

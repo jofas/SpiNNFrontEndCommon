@@ -20,7 +20,7 @@
 //! Code for ACK Packet
 #define ACK_CODE 0
 
-#define MAX_RETRIES 30
+#define MAX_RETRIES 300
 
 //! struct for a SDP message with pure data, no scp header
 typedef struct sdp_msg_pure_data {	// SDP message (=292 bytes)
@@ -84,6 +84,7 @@ static uint32_t seq_with_no_ack = 0;
 static uint32_t act_window = 0;
 static uint32_t index = 0;
 static uint8_t received_reset = 0;
+static uint32_t seq_cnt = 0;
 
 //! Variables for timer
 static uint32_t start;
@@ -164,6 +165,7 @@ void send_data(){
 
     uint32_t end_tmp;
     int i = 0;
+    int cpsr;
 
     //io_printf(IO_BUF, "sending\n");
 
@@ -191,12 +193,14 @@ void send_data(){
 
     seq_with_no_ack++;
 
-    io_printf(IO_BUF, "sent SDP seq %u\n", data[0]);
+    //io_printf(IO_BUF, "sent SDP seq %u\n", data[0]);
     //io_printf(IO_BUF, "MAX SEQ NUM: %u\n", max_seq_num);
 
     if(data[0] >= max_seq_num) {
 
         //io_printf(IO_BUF, "SENT LAST SEQUENCE!!\n");
+
+        cpsr = cpu_irq_enable();
 
         while(seq_with_no_ack > 0 && i < MAX_RETRIES) {
 
@@ -215,9 +219,16 @@ void send_data(){
         }
         if(i >= MAX_RETRIES) {
 
-        log_error("MAX RETRIES REACHED\n");
-        rt_error(RTE_SWERR);
+            my_msg.data[0] = 0x7FFFFFFF;
+            my_msg.length = 4;
+
+            while (!spin1_send_sdp_msg((sdp_msg_t *) &my_msg, 100));
+
+            log_error("MAX RETRIES REACHED\n");
+            rt_error(RTE_SWERR);
         }
+
+        cpu_int_restore(cpsr);
     }
 
     position_in_store = 1;
@@ -276,6 +287,16 @@ void receive_data(uint key, uint payload) {
 	int cpsr;
     int i = 0;
 
+    if(position_in_store != 0)
+        seq_cnt++;
+
+    if(seq_cnt != (payload+1) && position_in_store != 0 && key != new_sequence_key) {
+
+        log_error("Expected %d, got %d on check 1", seq_cnt-1, payload);
+        //rt_error(RTE_SWERR);
+        seq_cnt = payload + 1;
+    }
+
 	cpsr = cpu_irq_enable();
 
 	// Window is terminated
@@ -293,16 +314,23 @@ void receive_data(uint key, uint payload) {
     }
     if(i >= MAX_RETRIES) {
 
+        my_msg.data[0] = 0x7FFFFFFF;
+        my_msg.length = 4;
+
+        while (!spin1_send_sdp_msg((sdp_msg_t *) &my_msg, 100));
+
         log_error("MAX RETRIES REACHED\n");
         rt_error(RTE_SWERR);
     }
+
+    cpu_int_restore(cpsr);
 
     if (key == new_sequence_key) {
         if (position_in_store != 1) {
             send_data();
         }
-        log_info("finding new seq num %d", payload);
-        log_info("position in store is %d", position_in_store);
+        //log_info("finding new seq num %d", payload);
+        //log_info("position in store is %d", position_in_store);
         data[0] = payload;
         seq_num = payload;
         position_in_store = 1;
@@ -315,13 +343,20 @@ void receive_data(uint key, uint payload) {
         }
     } else {
 
+        if(seq_cnt != (payload+1) && position_in_store != 0) {
+
+            log_error("Expected %d, got %d on check 2", seq_cnt-1, payload);
+            //rt_error(RTE_SWERR);
+            seq_cnt = payload + 1;
+        }
+
         //log_info(" payload = %d posiiton = %d", payload, position_in_store);
         data[position_in_store] = payload;
         position_in_store += 1;
         //log_info("payload is %d", payload);
 
         if (key == first_data_key) {
-            log_info("resetting seq and position");
+            //log_info("resetting seq and position");
             seq_num = FIRST_SEQ_NUM;
             data[0] = seq_num;
             position_in_store = 1;
@@ -341,16 +376,15 @@ void receive_data(uint key, uint payload) {
             //Send_data call with no sequences, just end flag (INSTRUCTION NECESSARY?)
             //seq_with_no_ack--;
 
-            log_info("position = %d with seq num %d", position_in_store, seq_num);
+            //log_info("position = %d with seq num %d", position_in_store, seq_num);
             //log_info("last payload was %d", payload);
             send_data();
         } else if (position_in_store == ITEMS_PER_DATA_PACKET) {
-            log_info("position = %d with seq num %d", position_in_store, seq_num);
+            //log_info("position = %d with seq num %d", position_in_store, seq_num);
             //log_info("last payload was %d", payload);
             send_data();
         }
     }
-        cpu_int_restore(cpsr);
 }
 
 static bool initialize(uint32_t *timer_period) {
@@ -402,6 +436,8 @@ static bool initialize(uint32_t *timer_period) {
     my_msg.flags = 0x07;
     my_msg.srce_port = 3;
     my_msg.srce_addr = sv->p2p_addr;
+
+    seq_cnt = 0;
 
     return true;
 }
