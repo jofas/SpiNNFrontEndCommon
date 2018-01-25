@@ -290,12 +290,12 @@ void receive_data(uint key, uint payload) {
     if(position_in_store != 0)
         seq_cnt++;
 
-    if(seq_cnt != (payload+1) && position_in_store != 0 && key != new_sequence_key) {
+    /*if(seq_cnt != (payload+1) && position_in_store != 0 && key != new_sequence_key) {
 
         log_error("Expected %d, got %d on check 1", seq_cnt-1, payload);
         //rt_error(RTE_SWERR);
         seq_cnt = payload + 1;
-    }
+    }*/
 
 	cpsr = cpu_irq_enable();
 
@@ -343,12 +343,12 @@ void receive_data(uint key, uint payload) {
         }
     } else {
 
-        if(seq_cnt != (payload+1) && position_in_store != 0) {
+        /*if(seq_cnt != (payload+1) && position_in_store != 0) {
 
             log_error("Expected %d, got %d on check 2", seq_cnt-1, payload);
             //rt_error(RTE_SWERR);
             seq_cnt = payload + 1;
-        }
+        }*/
 
         //log_info(" payload = %d posiiton = %d", payload, position_in_store);
         data[position_in_store] = payload;
@@ -356,7 +356,7 @@ void receive_data(uint key, uint payload) {
         //log_info("payload is %d", payload);
 
         if (key == first_data_key) {
-            //log_info("resetting seq and position");
+            log_info("resetting seq and position");
             seq_num = FIRST_SEQ_NUM;
             data[0] = seq_num;
             position_in_store = 1;
@@ -367,7 +367,7 @@ void receive_data(uint key, uint payload) {
         if (key == end_flag_key){
             // set end flag bit in seq num
 
-            //io_printf(IO_BUF, "END_FLAG_KEY! %d\n", data[0]);
+            io_printf(IO_BUF, "END_FLAG_KEY! %d\n", data[0]);
             data[0] = data[0] + (1 << 31);
 
             // adjust size as last payload not counted
@@ -473,7 +473,7 @@ void c_main() {
     //simulation_sdp_callback_on(2, receive_reset);
 
     // start execution
-    //io_printf(IO_BUF, "Starting\n");
+    io_printf(IO_BUF, "Starting\n");
 
     // Start the time at "-1" so that the first tick will be 0
     time = UINT32_MAX;
