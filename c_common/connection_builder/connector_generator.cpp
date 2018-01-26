@@ -19,7 +19,7 @@ ConnectionBuilder::ConnectorGenerator::AllToAll::AllToAll(uint32_t *&region)
 {
   m_AllowSelfConnections = *region++;
 
-  LOG_PRINT(LOG_LEVEL_INFO, "\t\tAll-to-all: Self connections: %u",
+  LOG_PRINT(LOG_LEVEL_INFO, "\t\tAll-to-all: Self conns: %u",
             m_AllowSelfConnections);
 }
 //-----------------------------------------------------------------------------

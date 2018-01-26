@@ -147,7 +147,7 @@ ConnectionBuilder::ParamGenerator::Constant::Constant(uint32_t *&region)
 {
   m_Value = *reinterpret_cast<int32_t*>(region++);
 
-  LOG_PRINT(LOG_LEVEL_INFO, "\t\t\tConstant: %d", m_Value);
+  LOG_PRINT(LOG_LEVEL_INFO, "\t\t\tConstant: %u", m_Value);
 }
 //-----------------------------------------------------------------------------
 void ConnectionBuilder::ParamGenerator::Constant::Generate(
@@ -159,7 +159,9 @@ void ConnectionBuilder::ParamGenerator::Constant::Generate(
   // Copy constant into output
   for(uint32_t i = 0; i < number; i++)
   {
-    output[i] = m_Value >> 16;
+//    LOG_PRINT(LOG_LEVEL_INFO, "\t\t\t\t%u, %u, %u",
+//        m_Value, m_Value >> (16), m_Value >> (16-shift));
+    output[i] = m_Value >> (16-shift);
   }
 }
 

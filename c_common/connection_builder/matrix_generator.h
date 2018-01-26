@@ -85,7 +85,7 @@ public:
                 uint32_t pre_start, uint32_t pre_count,
                 uint32_t pre_block_start,  uint32_t pre_block_end,
                 uint32_t num_pre_neurons, uint32_t words_per_weight,
-                int32_t* weight_scales, uint32_t syn_type_bits,
+                uint32_t* weight_scales, uint32_t syn_type_bits,
                 ConnectorGenerator::Base *connectorGenerator,
                 const ParamGenerator::Base *delayGenerator,
                 const ParamGenerator::Base *weightGenerator, MarsKiss64 &rng,
@@ -194,7 +194,7 @@ protected:
   //-----------------------------------------------------------------------------
   virtual unsigned int WriteRow(uint32_t *synapse_mtx, uint32_t num_pre_neurons,
   uint32_t pre_idx, const uint32_t max_per_pre_matrix_size, const uint32_t numIndices,
-  const int32_t weight_shift,  uint32_t syn_type_bits, uint32_t words_per_weight,
+  const uint32_t weight_shift,  uint32_t syn_type_bits, uint32_t words_per_weight,
   const uint32_t max_num_plastic, const uint32_t max_num_static, uint32_t synapseType,
   const uint16_t (&indices)[512], const int32_t (&delays)[512], const int32_t (&weights)[512]) const = 0;
 
@@ -269,7 +269,7 @@ protected:
   //-----------------------------------------------------------------------------
   virtual unsigned int WriteRow(uint32_t *synapse_mtx, uint32_t num_pre_neurons,
   uint32_t pre_idx, const uint32_t max_per_pre_matrix_size, const uint32_t numIndices,
-  const int32_t weight_shift,  uint32_t syn_type_bits, uint32_t words_per_weight,
+  const uint32_t weight_shift,  uint32_t syn_type_bits, uint32_t words_per_weight,
   const uint32_t max_num_plastic, const uint32_t max_num_static, uint32_t synapseType,
   const uint16_t (&indices)[512], const int32_t (&delays)[512], const int32_t (&weights)[512]) const;
 
@@ -293,7 +293,7 @@ protected:
   //-----------------------------------------------------------------------------
   virtual unsigned int WriteRow(uint32_t *synapse_mtx, uint32_t num_pre_neurons,
   uint32_t pre_idx, const uint32_t max_per_pre_matrix_size, const uint32_t numIndices,
-  const int32_t weight_shift, uint32_t syn_type_bits, uint32_t words_per_weight,
+  const uint32_t weight_shift, uint32_t syn_type_bits, uint32_t words_per_weight,
   const uint32_t max_num_plastic, const uint32_t max_num_static, uint32_t synapseType,
   const uint16_t (&indices)[512], const int32_t (&delays)[512], const int32_t (&weights)[512]) const;
 

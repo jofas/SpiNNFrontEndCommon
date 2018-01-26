@@ -49,7 +49,7 @@ bool ConnectionBuilder::MatrixGenerator::Base::Generate(
   uint32_t pre_start,  uint32_t pre_count,
   uint32_t pre_block_start,  uint32_t pre_block_count,
   uint32_t num_pre_neurons, uint32_t words_per_weight,
-  int32_t *scales,  uint32_t syn_type_bits,
+  uint32_t *scales,  uint32_t syn_type_bits,
   ConnectorGenerator::Base *connectorGenerator,
   const ParamGenerator::Base *delayGenerator,
   const ParamGenerator::Base *weightGenerator,
@@ -181,14 +181,14 @@ void ConnectionBuilder::MatrixGenerator::Base::TraceInt(int32_t (&values)[512],
 //-----------------------------------------------------------------------------
 ConnectionBuilder::MatrixGenerator::Static::Static(uint32_t *&region) : Base(region)
 {
-  LOG_PRINT(LOG_LEVEL_INFO, "\t\tStatic synaptic matrix: %u signed weights",
+  LOG_PRINT(LOG_LEVEL_INFO, "\t\tStatic synaptic matrix: signed? %u",
     IsSignedWeight());
   is_static = true;
 }
 //-----------------------------------------------------------------------------
 unsigned int ConnectionBuilder::MatrixGenerator::Static::WriteRow(uint32_t *synapse_mtx,
   uint32_t num_pre_neurons, uint32_t pre_idx, const uint32_t max_per_pre_matrix_size,
-  const uint32_t numIndices, const int32_t weight_shift,
+  const uint32_t numIndices, const uint32_t weight_shift,
   uint32_t syn_type_bits, uint32_t words_per_weight,
   const uint32_t max_num_plastic, const uint32_t max_num_static, uint32_t synapseType,
   const uint16_t (&indices)[512], const int32_t (&delays)[512], const int32_t (&weights)[512]) const {
@@ -302,7 +302,7 @@ ConnectionBuilder::MatrixGenerator::Plastic::Plastic(uint32_t *&region) : Base(r
   is_static = false;
   // // Round up to words
   LOG_PRINT(LOG_LEVEL_INFO,
-        "\t\tPlastic synapse matrix: signed weights %u, num synapse pre-trace words %u",
+        "\t\tPlastic synapse matrix: signed? %u, num synapse pre-trace words %u",
         IsSignedWeight(), m_PreStateWords);
 
   // LOG_PRINT(LOG_LEVEL_INFO, "\t\tPlastic synaptic matrix: %u signed weights, %u bytes presynaptic state (%u words), %u bytes synapse trace",
@@ -311,7 +311,7 @@ ConnectionBuilder::MatrixGenerator::Plastic::Plastic(uint32_t *&region) : Base(r
 //-----------------------------------------------------------------------------
 unsigned int ConnectionBuilder::MatrixGenerator::Plastic::WriteRow(uint32_t *synapse_mtx,
   uint32_t num_pre_neurons, uint32_t pre_idx, const uint32_t max_per_pre_matrix_size,
-  const uint32_t numIndices, const int32_t weight_shift,
+  const uint32_t numIndices, const uint32_t weight_shift,
   uint32_t syn_type_bits, uint32_t words_per_weight,
   const uint32_t max_num_plastic, const uint32_t max_num_static, uint32_t synapseType,
   const uint16_t (&indices)[512], const int32_t (&delays)[512], const int32_t (&weights)[512]) const {

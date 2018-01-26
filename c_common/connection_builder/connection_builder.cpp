@@ -347,7 +347,7 @@ bool ReadConnectionBuilderRegion(uint32_t **in_region,
                                  uint32_t *synaptic_matrix_region, 
                                  uint32_t post_slice_start, 
                                  uint32_t post_slice_count,
-                                 int32_t *weight_scales,
+                                 uint32_t *weight_scales,
                                  uint32_t num_synapse_bits,
                                  uint32_t num_static,
                                  uint32_t num_plastic){
@@ -633,14 +633,14 @@ bool ReadSDRAMData(uint32_t *params_address, uint32_t *syn_mtx_addr){
   uint32_t num_synapse_types = *params_address++;
   uint32_t num_synapse_bits  = *params_address++;
 
-  int32_t *weight_scales = (int32_t *)params_address;
+  uint32_t *weight_scales = params_address;
   params_address += num_synapse_types;
 //  LOG_PRINT(LOG_LEVEL_INFO, "num_synapse_types = %u", num_synapse_types);
 
   uint32_t min_weight_scale = 100000;
 //  weight_scales[0] -= 1;
   for(uint32_t i = 0; i < num_synapse_types; i++){
-//    LOG_PRINT(LOG_LEVEL_INFO, "Weight scale %u = %u", i, weight_scales[i]);
+    LOG_PRINT(LOG_LEVEL_INFO, "Weight scale %u = %u", i, weight_scales[i]);
     if ( weight_scales[i] < min_weight_scale ){
       min_weight_scale = weight_scales[i];
     }
