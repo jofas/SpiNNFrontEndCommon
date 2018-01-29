@@ -228,6 +228,22 @@ void send_data(){
             rt_error(RTE_SWERR);
         }
 
+        i = 0;
+
+        while(!received_reset && i < MAX_RETRIES)
+            i++;
+
+        if(i >= MAX_RETRIES) {
+
+            my_msg.data[0] = 0x7FFFFFFF;
+            my_msg.length = 4;
+
+            while (!spin1_send_sdp_msg((sdp_msg_t *) &my_msg, 100));
+
+            log_error("MAX RETRIES REACHED WHILE WAITING FOR RESET\n");
+            rt_error(RTE_SWERR);
+        }
+
         cpu_int_restore(cpsr);
     }
 
@@ -258,9 +274,9 @@ void receive_ack(uint mailbox, uint port) {
 	spin1_msg_free((sdp_msg_t *) msg);
 }
 
-/*void receive_reset(uint mailbox, uint port) {
+void receive_reset(uint mailbox, uint port) {
 
-	uint8_t payload;
+	uint32_t payload;
 
 	use(port);
 
@@ -269,7 +285,7 @@ void receive_ack(uint mailbox, uint port) {
 		io_printf(IO_BUF, "RECEIVED RESET\n");
 
 		payload = 0;
-		spin1_memcpy(&my_msg.data, payload, 1);
+		spin1_memcpy(&my_msg.data, payload, 4);
 		my_msg.length = 1;
 
 		while (!spin1_send_sdp_msg((sdp_msg_t *) &my_msg, 100));
@@ -280,7 +296,7 @@ void receive_ack(uint mailbox, uint port) {
 		seq_with_no_ack = 0;
 		index = 0;
 	}
-}*/
+}
 
 void receive_data(uint key, uint payload) {
 

@@ -371,7 +371,8 @@ void host_data_receiver::processor_thread(UDPConnection *sender) {
 	set<uint32_t> *received_seq_nums = new set<uint32_t>;
 	set<uint32_t> **received_in_windows = new set<uint32_t> *[(int)ceil((float)this->max_seq_num/(float)(this->window_size))];
 	packet p;
-	uint32_t received_seqs = 0;
+	uint32_t received_seqs = 0, payload, rst = 1;
+
 
 	for(int i = 0 ; i < (int)ceil((float)this->max_seq_num/(float)(this->window_size)) ; i++)
 		received_in_windows[i] = new set<uint32_t>;
@@ -392,7 +393,6 @@ void host_data_receiver::processor_thread(UDPConnection *sender) {
 
 		 }catch(TimeoutQueueException e) {
 
-		 	//Eventually increase timeout to include the one added board side, here we aren't asking for retransmission anymore!
 		 	if (timeoutcount > TIMEOUT_RETRY_LIMIT) {
 
 				this->pcr.thrown = true;
@@ -416,6 +416,54 @@ void host_data_receiver::processor_thread(UDPConnection *sender) {
 		 if(this->rdr.thrown == true)
 		 	return;
 	}
+
+	//Send reset to confirm the completion of transmission
+	while(rst != 0) {
+
+		payload = 1;
+
+		SDPMessage message = SDPMessage(
+        	this->chip_x, this->chip_y, this->chip_p, 1,
+        	SDPMessage::REPLY_NOT_EXPECTED, 255, 255,
+        	255, 0, 0, (char *)&payload, sizeof(uint32_t));
+
+		try {
+
+    		//Send Reset
+    		sender->send_data(message.convert_to_byte_array(), message.length_in_bytes());
+
+    		//Read ACK from Board
+    		p = messqueue->pop();
+
+    		memcpy(&rst, p.content, sizeof(uint32_t));
+    	}
+
+    	catch(TimeoutQueueException e) {
+
+		 	if (timeoutcount > TIMEOUT_RETRY_LIMIT) {
+
+				this->pcr.thrown = true;
+				this->pcr.val = "Failed to hear from the machine. Please try removing firewalls";
+				//Verify
+				delete sender;
+				return;
+
+			}
+
+		 	timeoutcount++;
+
+		 }catch(const char *e) {
+
+		 	this->pcr.thrown = true;
+			this->pcr.val = e;
+			delete sender;
+			return;
+		 }
+
+		 if(this->rdr.thrown == true)
+		 	return;
+
+    }
 
 	// close socket and inform the reader that transmission is completed
 	delete sender;
