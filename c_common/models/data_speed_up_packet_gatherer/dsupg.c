@@ -280,12 +280,14 @@ void receive_reset(uint mailbox, uint port) {
 
 	use(port);
 
+    sdp_msg_pure_data *msg = (sdp_msg_pure_data *) mailbox;
+
 	if(msg->data[0] == 1) {
 
 		io_printf(IO_BUF, "RECEIVED RESET\n");
 
 		payload = 0;
-		spin1_memcpy(&my_msg.data, payload, 4);
+		spin1_memcpy(&my_msg.data, &payload, 4);
 		my_msg.length = 1;
 
 		while (!spin1_send_sdp_msg((sdp_msg_t *) &my_msg, 100));
@@ -296,6 +298,9 @@ void receive_reset(uint mailbox, uint port) {
 		seq_with_no_ack = 0;
 		index = 0;
 	}
+
+    //Free the message
+    spin1_msg_free((sdp_msg_t *) msg);
 }
 
 void receive_data(uint key, uint payload) {
@@ -486,7 +491,7 @@ void c_main() {
     spin1_callback_on(TIMER_TICK, timer_callback, 0);
    //spin1_callback_on(SDP_PACKET_RX, receive_ack, SDP);
     simulation_sdp_callback_on(1, receive_ack);
-    //simulation_sdp_callback_on(2, receive_reset);
+    simulation_sdp_callback_on(2, receive_reset);
 
     // start execution
     io_printf(IO_BUF, "Starting\n");
