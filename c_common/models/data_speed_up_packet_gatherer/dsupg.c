@@ -80,7 +80,7 @@ static uint32_t window_size = 0;
 static uint32_t sliding_window = 0;
 static uint32_t start_pos = 0;
 static uint32_t end_pos = 0;
-static uint32_t seq_with_no_ack = 0;
+static int32_t seq_with_no_ack = 0;
 static uint32_t act_window = 0;
 static uint32_t index = 0;
 static uint8_t received_reset = 0;
@@ -122,7 +122,7 @@ void re_send_window() {
 
         if(end > start) {
 
-            for(i = start; i <= end && seq_with_no_ack >= window; i++) {
+            for(i = start; i <= end && (uint32_t)seq_with_no_ack >= window; i++) {
 
                 spin1_memcpy(&my_msg.data, &(buffer[i].data), buffer[i].size);
                 my_msg.length = LENGTH_OF_SDP_HEADER + buffer[i].size;
@@ -132,7 +132,7 @@ void re_send_window() {
         }
         else {
 
-            for(i = start; i < window && seq_with_no_ack >= window; i++) {
+            for(i = start; i < window && (uint32_t)seq_with_no_ack >= window; i++) {
 
                 spin1_memcpy(&my_msg.data, &(buffer[i].data), buffer[i].size);
                 my_msg.length = LENGTH_OF_SDP_HEADER + buffer[i].size;
@@ -140,7 +140,7 @@ void re_send_window() {
                 while(!spin1_send_sdp_msg((sdp_msg_t *) &my_msg, 100));
             }
 
-            for(i = 0 ; i <= end && seq_with_no_ack >= window; i++) {
+            for(i = 0 ; i <= end && (uint32_t)seq_with_no_ack >= window; i++) {
 
                 spin1_memcpy(&my_msg.data, &(buffer[i].data), buffer[i].size);
                 my_msg.length = LENGTH_OF_SDP_HEADER + buffer[i].size;
@@ -198,14 +198,14 @@ void send_data(){
 
     if(data[0] >= max_seq_num) {
 
-        //io_printf(IO_BUF, "SENT LAST SEQUENCE!!\n");
+        io_printf(IO_BUF, "SENT LAST SEQUENCE!!\n");
 
         cpsr = cpu_irq_enable();
 
         while(seq_with_no_ack > 0 && i < MAX_RETRIES) {
 
-                //io_printf(IO_BUF, "waiting for ack for last sliding window\n");
-                //io_printf(IO_BUF, "window number %d, seq_with_no_ack %d\n", act_window, seq_with_no_ack);
+                io_printf(IO_BUF, "waiting for ack for last sliding window\n");
+                io_printf(IO_BUF, "window number %d, seq_with_no_ack %d\n", act_window, seq_with_no_ack);
 
         		start = start_pos;
         		end = end_tmp;
@@ -217,6 +217,8 @@ void send_data(){
         		spin1_pause();
         		i++;
         }
+
+        io_printf(IO_BUF, "HERE 1\n");
         if(i >= MAX_RETRIES) {
 
             my_msg.data[0] = 0x7FFFFFFF;
@@ -228,10 +230,15 @@ void send_data(){
             rt_error(RTE_SWERR);
         }
 
+        io_printf(IO_BUF, "HERE 2\n");
+
         i = 0;
 
-        while(!received_reset && i < MAX_RETRIES)
+       /* while(received_reset == 0 && i < 100000000) {
+
+            //log_info("Waiting for reset");
             i++;
+        }
 
         if(i >= MAX_RETRIES) {
 
@@ -242,7 +249,7 @@ void send_data(){
 
             log_error("MAX RETRIES REACHED WHILE WAITING FOR RESET\n");
             rt_error(RTE_SWERR);
-        }
+        }*/
 
         cpu_int_restore(cpsr);
     }
@@ -274,7 +281,7 @@ void receive_ack(uint mailbox, uint port) {
 	spin1_msg_free((sdp_msg_t *) msg);
 }
 
-void receive_reset(uint mailbox, uint port) {
+/*void receive_reset(uint mailbox, uint port) {
 
 	uint32_t payload;
 
@@ -302,7 +309,7 @@ void receive_reset(uint mailbox, uint port) {
     //Free the message
     spin1_msg_free((sdp_msg_t *) msg);
 }
-
+*/
 void receive_data(uint key, uint payload) {
 
 	int cpsr;
@@ -321,7 +328,7 @@ void receive_data(uint key, uint payload) {
 	cpsr = cpu_irq_enable();
 
 	// Window is terminated
-    while(seq_with_no_ack >= sliding_window && i < MAX_RETRIES) {
+    while((uint32_t)seq_with_no_ack >= sliding_window && i < MAX_RETRIES) {
 
         //io_printf(IO_BUF, "Waiting for ACK for window %d\n", act_window);
 		//No ACK received
@@ -382,7 +389,11 @@ void receive_data(uint key, uint payload) {
             data[0] = seq_num;
             position_in_store = 1;
             max_seq_num = payload;
-            received_reset = 0;
+            //received_reset = 0;
+            start_pos = 0;
+            end_pos = sliding_window - 1;
+            seq_with_no_ack = 0;
+            index = 0;
         }
 
         if (key == end_flag_key){
@@ -491,7 +502,7 @@ void c_main() {
     spin1_callback_on(TIMER_TICK, timer_callback, 0);
    //spin1_callback_on(SDP_PACKET_RX, receive_ack, SDP);
     simulation_sdp_callback_on(1, receive_ack);
-    simulation_sdp_callback_on(2, receive_reset);
+    //simulation_sdp_callback_on(2, receive_reset);
 
     // start execution
     io_printf(IO_BUF, "Starting\n");

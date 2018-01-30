@@ -417,6 +417,8 @@ void host_data_receiver::processor_thread(UDPConnection *sender) {
 		 	return;
 	}
 
+	//sleep(1);
+/*
 	//Send reset to confirm the completion of transmission
 	while(rst != 0) {
 
@@ -424,10 +426,12 @@ void host_data_receiver::processor_thread(UDPConnection *sender) {
 
 		payload = 1;
 
+		memcpy(data, &payload, sizeof(uint32_t));
+
 		SDPMessage message = SDPMessage(
-        	this->chip_x, this->chip_y, this->chip_p, 2,
+        	this->chip_x, this->chip_y, this->chip_p, 1,
         	SDPMessage::REPLY_NOT_EXPECTED, 255, 255,
-        	255, 0, 0, (char *)&payload, sizeof(uint32_t));
+        	255, 0, 0, data, sizeof(uint32_t));
 
 		try {
 
@@ -468,7 +472,7 @@ void host_data_receiver::processor_thread(UDPConnection *sender) {
 		 	return;
 
     }
-
+*/
 	// close socket and inform the reader that transmission is completed
 	delete sender;
 	this->finished_transfer = true;
