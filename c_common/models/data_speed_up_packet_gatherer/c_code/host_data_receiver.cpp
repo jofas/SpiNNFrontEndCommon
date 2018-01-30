@@ -420,10 +420,12 @@ void host_data_receiver::processor_thread(UDPConnection *sender) {
 	//Send reset to confirm the completion of transmission
 	while(rst != 0) {
 
+		cout << "RESET PHASE" << endl;
+
 		payload = 1;
 
 		SDPMessage message = SDPMessage(
-        	this->chip_x, this->chip_y, this->chip_p, 1,
+        	this->chip_x, this->chip_y, this->chip_p, 2,
         	SDPMessage::REPLY_NOT_EXPECTED, 255, 255,
         	255, 0, 0, (char *)&payload, sizeof(uint32_t));
 
@@ -431,6 +433,8 @@ void host_data_receiver::processor_thread(UDPConnection *sender) {
 
     		//Send Reset
     		sender->send_data(message.convert_to_byte_array(), message.length_in_bytes());
+
+    		cout << "RESET SENT!" << endl;
 
     		//Read ACK from Board
     		p = messqueue->pop();
