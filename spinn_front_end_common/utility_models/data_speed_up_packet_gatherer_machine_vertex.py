@@ -183,7 +183,7 @@ class DataSpeedUpPacketGatherMachineVertex(
         # write data for the simulation data item
         spec.switch_write_focus(self.DATA_REGIONS.SYSTEM.value)
         spec.write_array(simulation_utilities.get_simulation_header_array(
-            self.get_binary_file_name(), 3000000, 1)) #HERE TIMEOUT FOR THE C CODE
+            self.get_binary_file_name(), 20000, 1)) #HERE TIMEOUT FOR THE C CODE
 
         # the keys for the special cases
         if self.TRAFFIC_TYPE == EdgeTrafficType.MULTICAST:
@@ -202,9 +202,9 @@ class DataSpeedUpPacketGatherMachineVertex(
         spec.write_value(end_flag_key)
 
         #Width of the sliding window
-        self._sliding_window_c = 50
+        self._sliding_window_c = 200
         #Width of the shift
-        self._window_size = 10
+        self._window_size = 75
 
         # Data for windowed protocol
         spec.write_value(self._sliding_window_c)
