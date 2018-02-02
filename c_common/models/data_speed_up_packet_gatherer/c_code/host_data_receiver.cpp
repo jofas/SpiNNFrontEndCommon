@@ -37,12 +37,12 @@ int miss_cnt;
 host_data_receiver::host_data_receiver(int port_connection, int placement_x, int placement_y, int placement_p,
 		char *hostname, int length_in_bytes, int memory_address, int chip_x, int chip_y, int chip_p, int iptag, uint32_t window_size, uint32_t sliding_window) {
 
-	this->port_connection = port_connection; 
-	this->placement_x = placement_x; 
-	this->placement_y = placement_y; 
+	this->port_connection = port_connection;
+	this->placement_x = placement_x;
+	this->placement_y = placement_y;
 	this->placement_p = placement_p;
 	this->hostname = hostname;
-	this->length_in_bytes = (uint32_t)length_in_bytes; 
+	this->length_in_bytes = (uint32_t)length_in_bytes;
 	this->memory_address = (uint32_t)memory_address;
 	this->chip_x = chip_x;
 	this->chip_y = chip_y;
@@ -183,7 +183,7 @@ void host_data_receiver::send_ack(UDPConnection *sender, uint32_t window) {
 
 
 // Function for processing each received packet and checking end of transmission
-void host_data_receiver::process_data(UDPConnection *sender, bool *finished, 
+void host_data_receiver::process_data(UDPConnection *sender, bool *finished,
 										set<uint32_t> *received_seq_nums, char *recvdata, int datalen,
 										uint32_t *received_seqs, set<uint32_t> **received_in_windows) {
 
@@ -205,7 +205,10 @@ void host_data_receiver::process_data(UDPConnection *sender, bool *finished,
 
 	//If received seq is lower than the window discard it as it has already been received
 	//window check is performed in any case to be sure to shift the window
-	if(seq_num >= window_start) {
+
+	miss_cnt++;
+
+	if(seq_num >= this->window_start) {
 
 		is_end_of_stream = ((first_packet_element & LAST_MESSAGE_FLAG_BIT_MASK) != 0) ? true : false;
 
@@ -227,8 +230,6 @@ void host_data_receiver::process_data(UDPConnection *sender, bool *finished,
 			memcpy(buffer+offset, recvdata+SEQUENCE_NUMBER_SIZE, (true_data_length-offset));
 		}
 
-		miss_cnt++;
-
 		//Logaritmic operation, any way to get it faster?
 		if(received_seq_nums->find(seq_num) == received_seq_nums->end())
 			(*received_seqs)++;
@@ -248,7 +249,7 @@ void host_data_receiver::process_data(UDPConnection *sender, bool *finished,
 
 					this->is_last = true;
 					this->last_seq = seq_num;
-					
+
 					//If all sequences in last window have been received
 					if(check(received_in_windows[this->window_start/this->window_size], ((seq_num + 1) - this->window_start) - 1)) {
 
@@ -298,7 +299,7 @@ void host_data_receiver::process_data(UDPConnection *sender, bool *finished,
 	}
 	else {
 		//In case ACK has not been received
-		send_ack(sender, seq_num/this->window_size);		
+		send_ack(sender, seq_num/this->window_size);
 	}
 
 }
@@ -342,12 +343,12 @@ void host_data_receiver::processor_thread(UDPConnection *sender) {
 	int receivd = 0, timeoutcount = 0, datalen;
 	bool finished = false;
 	set<uint32_t> *received_seq_nums = new set<uint32_t>;
-	set<uint32_t> **received_in_windows = new set<uint32_t> *[(int)ceil((float)this->max_seq_num/(float)(this->window_size))];
+	set<uint32_t> **received_in_windows = new set<uint32_t> *[(int)ceil((float)this->max_seq_num/(float)(this->window_size))+1];
 	packet p;
 	uint32_t received_seqs = 0, payload, rst = 1;
 
 
-	for(int i = 0 ; i < (int)ceil((float)this->max_seq_num/(float)(this->window_size)) ; i++)
+	for(int i = 0 ; i < (int)ceil((float)this->max_seq_num/(float)(this->window_size))+1 ; i++)
 		received_in_windows[i] = new set<uint32_t>;
 
 	while(!finished) {
@@ -467,7 +468,7 @@ char * host_data_receiver::get_data() {
 
 			cout << this->pcr.val << endl;
 			return NULL;
-		} 
+		}
 		else if(this->rdr.thrown == true && this->finished_transfer == false) {
 
 			cout << this->rdr.val << endl;
@@ -505,14 +506,14 @@ void host_data_receiver::get_data_threadable(char *filepath_read, char *filepath
 	get_data();
 
 	fp1 = fopen(filepath_read, "wb");
-	//fp2 = fopen(filepath_missing, "w");
+	fp2 = fopen(filepath_missing, "a");
 
 	fwrite(this->buffer, sizeof(char), length_in_bytes, fp1);
 
-	//fprintf(fp2, "%d\n", miss_cnt);
+	fprintf(fp2, "%d\n", miss_cnt);
 
 	fclose(fp1);
-	//fclose(fp2);
+	fclose(fp2);
 
 }
 /*

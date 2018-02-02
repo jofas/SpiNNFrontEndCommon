@@ -20,7 +20,8 @@
 //! Code for ACK Packet
 #define ACK_CODE 0
 
-#define MAX_RETRIES 100
+//Should be large enough, in the worst case all the sliding window is retransmitted
+#define MAX_RETRIES 4000
 
 //! struct for a SDP message with pure data, no scp header
 typedef struct sdp_msg_pure_data {	// SDP message (=292 bytes)
@@ -94,6 +95,7 @@ static uint32_t window;
 //! Buffer containing all the packets of the window
 static buffer_elem *buffer;
 
+static uint8_t timer = 0;
 //! human readable definitions of each region in SDRAM
 typedef enum regions_e {
     SYSTEM_REGION, CONFIG
@@ -158,8 +160,9 @@ void timer_callback(uint time, uint unused) {
 
     use(time);
     use(unused);
-
-	re_send_window();
+    //log_info("Got Timer Interrupt");
+    timer = 1;
+	//re_send_window();
 }
 
 //Send data function
@@ -180,7 +183,8 @@ void send_data(){
 	buffer[index].size = position_in_store * WORD_TO_BYTE_MULTIPLIER;
     end_tmp = index;
     //set position in the buffer for next data
-	index = (index + 1) % sliding_window;
+    if(++index >= sliding_window)
+    		index = 0;
 
     if (seq_num > max_seq_num){
         log_error(
@@ -189,8 +193,9 @@ void send_data(){
     }
 
     while (!spin1_send_sdp_msg((sdp_msg_t *) &my_msg, 100)) {
-	// Empty body
     }
+
+    io_printf(IO_BUF, "Sent:%d\n", seq_num);
 
     //Update number of sequences sent without receiving any ack
     seq_with_no_ack++;
@@ -206,11 +211,16 @@ void send_data(){
         		start = start_pos;
         		end = end_tmp;
         		window = seq_with_no_ack;
-
+        		timer = 0;
+        		//cpu_int_restore(cpsr);
         		spin1_resume(SYNC_NOWAIT);
         		spin1_wfi();
-        		spin1_pause();
         		i++;
+        		spin1_pause();
+        		//cpsr = cpu_irq_enable();
+        		if(timer) {
+        			re_send_window();
+        		}
         }
 
         cpu_int_restore(cpsr);
@@ -227,19 +237,28 @@ void receive_ack(uint mailbox, uint port) {
 	use(port);
 
 	sdp_msg_pure_data *msg = (sdp_msg_pure_data *) mailbox;
-
-	//If packets contains ack code and the number of the window we are waiting ack for
-    if(msg->data[0] == ACK_CODE && msg->data[1] == act_window) {
-
-		//clean the part of the buffer dedicatet to that window and increase window number
-        start_pos = (start_pos + window_size) % sliding_window;
-		end_pos = (end_pos + window_size) % sliding_window;
-		seq_with_no_ack -= window_size;
-		act_window++;
-	}
+	uint32_t val, win;
+	val = msg->data[0];
+	win = msg->data[1];
 
 	//Free the message
 	spin1_msg_free((sdp_msg_t *) msg);
+
+	//If packets contains ack code and the number of the window we are waiting ack for
+    if(val == ACK_CODE && win == act_window) {
+
+		//clean the part of the buffer dedicatet to that window and increase window number
+    		if((start_pos += window_size) >= sliding_window) {
+
+    			start_pos = 0;
+    		}
+    		if((end_pos += window_size) >= sliding_window) {
+
+    		    			end_pos = 0;
+    		    		}
+		seq_with_no_ack -= window_size;
+		act_window++;
+	}
 }
 
 //Function used to reset after completion of transmission
@@ -250,8 +269,12 @@ void receive_reset(uint mailbox, uint port) {
 	use(port);
 
     sdp_msg_pure_data *msg = (sdp_msg_pure_data *) mailbox;
+    uint32_t val = msg->data[0];
 
-	if(msg->data[0] == 1) {
+    //Free the message
+    spin1_msg_free((sdp_msg_t *) msg);
+
+	if(val == 1) {
 
 		payload = 0;
 		spin1_memcpy(&my_msg.data, &payload, 4);
@@ -267,9 +290,6 @@ void receive_reset(uint mailbox, uint port) {
 		index = 0;
         act_window = 0;
 	}
-
-    //Free the message
-    spin1_msg_free((sdp_msg_t *) msg);
 }
 
 void receive_data(uint key, uint payload) {
@@ -291,10 +311,16 @@ void receive_data(uint key, uint payload) {
         start = start_pos;
         end = end_pos;
         window = sliding_window;
+        timer = 0;
+        //cpu_int_restore(cpsr);
         spin1_resume(SYNC_NOWAIT);
         spin1_wfi();
         i++;
         spin1_pause();
+        //cpsr = cpu_irq_enable();
+        if(timer) {
+        		re_send_window();
+        }
     }
     if(i >= MAX_RETRIES) {
 

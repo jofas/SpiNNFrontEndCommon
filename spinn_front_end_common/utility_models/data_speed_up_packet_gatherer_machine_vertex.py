@@ -204,7 +204,7 @@ class DataSpeedUpPacketGatherMachineVertex(
         #Width of the sliding window
         self._sliding_window_c = 200
         #Width of the shift
-        self._window_size = 75
+        self._window_size = 50
 
         # Data for windowed protocol
         spec.write_value(self._sliding_window_c)
