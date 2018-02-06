@@ -86,6 +86,7 @@ static uint32_t act_window = 0;
 static uint32_t index = 0;
 static uint8_t received_reset = 0;
 static uint32_t seq_cnt = 0;
+static uint32_t offset = 0;
 
 //! Variables for timer
 static uint32_t start;
@@ -237,27 +238,36 @@ void receive_ack(uint mailbox, uint port) {
 	use(port);
 
 	sdp_msg_pure_data *msg = (sdp_msg_pure_data *) mailbox;
-	uint32_t val, win;
+
+	uint32_t val, seq, new_win;
+
 	val = msg->data[0];
-	win = msg->data[1];
+	seq = msg->data[1];
+    new_win = msg->data[2];
+
 
 	//Free the message
 	spin1_msg_free((sdp_msg_t *) msg);
 
 	//If packets contains ack code and the number of the window we are waiting ack for
-    if(val == ACK_CODE && win == act_window) {
+    if(val == ACK_CODE && seq/window_size == act_window) {
 
-		//clean the part of the buffer dedicatet to that window and increase window number
+		//clean the part of the buffer dedicated to that window and increase window number
     		if((start_pos += window_size) >= sliding_window) {
 
-    			start_pos = 0;
+    			start_pos -= sliding_window;
     		}
     		if((end_pos += window_size) >= sliding_window) {
 
-    		    			end_pos = 0;
-    		    		}
+                end_pos -= sliding_window;
+    		}
 		seq_with_no_ack -= window_size;
-		act_window++;
+
+        if(new_win == 1) {
+
+		  act_window++;
+          offset = 0;
+        }
 	}
 }
 

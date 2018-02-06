@@ -78,18 +78,17 @@ char * host_data_receiver::build_scp_req(uint16_t cmd, uint32_t port, int strip_
 	uint16_t seq = 0;
 	uint32_t arg = 0;
 
-	char *buffertmp = new char[4*sizeof(uint32_t)];
+	uint32_t *buffertmp = new uint32_t[4];
 
 	memcpy(buffertmp, &cmd, sizeof(uint16_t));
 	memcpy(buffertmp+sizeof(uint16_t), &seq, sizeof(uint16_t));
 
 	arg = arg | (strip_sdp << 28) | (1 << 16) | this->iptag;
-	memcpy(buffertmp+sizeof(uint32_t), &arg, sizeof(uint32_t));
-	memcpy(buffertmp+2*sizeof(uint32_t), &port, sizeof(uint32_t));
-	memcpy(buffertmp+3*sizeof(uint32_t), &ip_address, sizeof(uint32_t));
+	buffertmp[1] = arg;
+	buffertmp[2] = port;
+	buffertmp[3] = ip_address;
 
-
-	return buffertmp;
+	return (char *)buffertmp;
 }
 
 
@@ -112,17 +111,17 @@ void host_data_receiver::send_initial_command(UDPConnection *sender, UDPConnecti
 	sender->receive_data(buf, 300);
 
     // Create Data request SDP packet
-	char start_message_data[3*sizeof(uint32_t)];
+	uint32_t start_message_data[3];
 
     // add data
-	memcpy(start_message_data, &SDP_PACKET_START_SENDING_COMMAND_ID, sizeof(uint32_t));
-	memcpy(start_message_data+sizeof(uint32_t), &this->memory_address, sizeof(uint32_t));
-	memcpy(start_message_data+2*sizeof(uint32_t), &this->length_in_bytes, sizeof(uint32_t));
+    start_message_data[0] = SDP_PACKET_START_SENDING_COMMAND_ID;
+    start_message_data[1] = memory_address;
+    start_message_data[2] = length_in_bytes;
 
     // build SDP message
     SDPMessage message = SDPMessage(
         this->placement_x, this->placement_y, this->placement_p, this->port_connection,
-        SDPMessage::REPLY_NOT_EXPECTED, 255, 255, 255, 0, 0, start_message_data,
+        SDPMessage::REPLY_NOT_EXPECTED, 255, 255, 255, 0, 0, (char *)start_message_data,
         3*sizeof(uint32_t));
 
     //send message
@@ -164,18 +163,19 @@ bool host_data_receiver::check(set<uint32_t> *received_seq_nums, uint32_t max_ne
 	return true;
 }
 
-void host_data_receiver::send_ack(UDPConnection *sender, uint32_t window) {
+void host_data_receiver::send_ack(UDPConnection *sender, uint32_t window, uint32_t shift) {
 
-	char data_field[2*sizeof(uint32_t)];
+	uint32_t data_field[3];
 
 	//Used char array in order to modify it for selective ACK or for greater message
-	memcpy(data_field, &ACK_MESSAGE_CODE, sizeof(uint32_t));
-	memcpy(data_field+sizeof(uint32_t), &window, sizeof(uint32_t));
+	data_field[0] = ACK_MESSAGE_CODE;
+	data_field[1] = window;
+	data_field[2] = shift;
 
     SDPMessage message = SDPMessage(
         this->chip_x, this->chip_y, this->chip_p, 1,
         SDPMessage::REPLY_NOT_EXPECTED, 255, 255,
-        255, 0, 0, data_field, 2*sizeof(uint32_t));
+        255, 0, 0, (char *)data_field, 3*sizeof(uint32_t));
 
     //Send ACK
     sender->send_data(message.convert_to_byte_array(), message.length_in_bytes());
@@ -185,11 +185,12 @@ void host_data_receiver::send_ack(UDPConnection *sender, uint32_t window) {
 // Function for processing each received packet and checking end of transmission
 void host_data_receiver::process_data(UDPConnection *sender, bool *finished,
 										set<uint32_t> *received_seq_nums, char *recvdata, int datalen,
-										uint32_t *received_seqs, set<uint32_t> **received_in_windows) {
+										uint32_t *received_seqs, set<uint32_t> **received_in_windows,
+										uint32_t *seq) {
 
 	int length_of_data, i, j;
 	uint32_t last_mc_packet, first_packet_element, offset, true_data_length, seq_num;
-	bool is_end_of_stream;
+	bool is_end_of_stream, ack_sent = false;
 
 	//Data size of the packet
 	length_of_data = datalen;
@@ -254,7 +255,7 @@ void host_data_receiver::process_data(UDPConnection *sender, bool *finished,
 					if(check(received_in_windows[this->window_start/this->window_size], ((seq_num + 1) - this->window_start) - 1)) {
 
 						*finished = true;
-						send_ack(sender, this->window_start/this->window_size);
+						send_ack(sender, seq_num, 1);
 
 						return;
 					}
@@ -263,7 +264,7 @@ void host_data_receiver::process_data(UDPConnection *sender, bool *finished,
 			else {
 
 				*finished = true;
-				send_ack(sender, this->window_start/this->window_size);
+				send_ack(sender, seq_num, 1);
 
 				return;
 			}
@@ -279,28 +280,34 @@ void host_data_receiver::process_data(UDPConnection *sender, bool *finished,
 				if(check(received_in_windows[this->window_start/this->window_size], ((this->last_seq + 1) - this->window_start) - 1)) {
 
 					*finished = true;
-					send_ack(sender, this->window_start/this->window_size);
+					send_ack(sender, seq_num, 1);
 
 					return;
 				}
 			}
 			else if(check(received_in_windows[this->window_start/this->window_size], this->window_size-1)) {
 
-				send_ack(sender, this->window_start/this->window_size);
+				send_ack(sender, seq_num, 1);
 
-
-				//Add check to not overcome max_seq_num boundary!!
 				this->window_start += this->window_size;
 				this->window_end += this->window_size;
+				ack_sent = true;
 
 			}
+		}
 
+		//Intermediate ack, window_size/3 is to avoid to saturate the network of acks
+		if(seq_num > *seq + 1 && !ack_sent && *seq < this->window_end && *seq > this->window_start+(this->window_size/3) && seq_num != 0) {
+
+			send_ack(sender, seq, 0);
 		}
 	}
 	else {
 		//In case ACK has not been received
-		send_ack(sender, seq_num/this->window_size);
+		send_ack(sender, seq_num, 1);
 	}
+
+	*seq = seq_num;
 
 }
 
@@ -345,7 +352,7 @@ void host_data_receiver::processor_thread(UDPConnection *sender) {
 	set<uint32_t> *received_seq_nums = new set<uint32_t>;
 	set<uint32_t> **received_in_windows = new set<uint32_t> *[(int)ceil((float)this->max_seq_num/(float)(this->window_size))+1];
 	packet p;
-	uint32_t received_seqs = 0, payload, rst = 1;
+	uint32_t received_seqs = 0, payload, rst = 1, seq = 0;
 
 
 	for(int i = 0 ; i < (int)ceil((float)this->max_seq_num/(float)(this->window_size))+1 ; i++)
@@ -357,11 +364,7 @@ void host_data_receiver::processor_thread(UDPConnection *sender) {
 
 		 	p = messqueue->pop();
 
-		 	//memcpy(data, p.content, p.size*sizeof(char));
-		 	//datalen = p.size;
-
-
-		 	process_data(sender, &finished, received_seq_nums, p.content, p.size, &received_seqs, received_in_windows);
+		 	process_data(sender, &finished, received_seq_nums, p.content, p.size, &received_seqs, received_in_windows, &seq);
 
 		 }catch(TimeoutQueueException e) {
 
