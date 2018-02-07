@@ -87,6 +87,7 @@ static uint32_t index = 0;
 static uint8_t received_reset = 0;
 static uint32_t seq_cnt = 0;
 static uint32_t offset = 0;
+static uint32_t last_ack = 0;
 
 //! Variables for timer
 static uint32_t start;
@@ -143,6 +144,7 @@ void re_send_window() {
                 my_msg.length = LENGTH_OF_SDP_HEADER + buffer[i].size;
 
                 while(!spin1_send_sdp_msg((sdp_msg_t *) &my_msg, 100));
+
             }
 
             for(i = 0 ; i <= end && (uint32_t)seq_with_no_ack >= window; i++) {
@@ -196,8 +198,6 @@ void send_data(){
     while (!spin1_send_sdp_msg((sdp_msg_t *) &my_msg, 100)) {
     }
 
-    io_printf(IO_BUF, "Sent:%d\n", seq_num);
-
     //Update number of sequences sent without receiving any ack
     seq_with_no_ack++;
 
@@ -239,35 +239,46 @@ void receive_ack(uint mailbox, uint port) {
 
 	sdp_msg_pure_data *msg = (sdp_msg_pure_data *) mailbox;
 
-	uint32_t val, seq, new_win;
+	uint32_t val, seq, new_win, win, slide = 0;
 
 	val = msg->data[0];
 	seq = msg->data[1];
     new_win = msg->data[2];
+    win = msg->data[3];
 
 
 	//Free the message
 	spin1_msg_free((sdp_msg_t *) msg);
 
 	//If packets contains ack code and the number of the window we are waiting ack for
-    if(val == ACK_CODE && seq/window_size == act_window) {
-
-		//clean the part of the buffer dedicated to that window and increase window number
-    		if((start_pos += window_size) >= sliding_window) {
-
-    			start_pos -= sliding_window;
-    		}
-    		if((end_pos += window_size) >= sliding_window) {
-
-                end_pos -= sliding_window;
-    		}
-		seq_with_no_ack -= window_size;
+    if(val == ACK_CODE && win == act_window && seq > last_ack) {
 
         if(new_win == 1) {
 
-		  act_window++;
-          offset = 0;
+            act_window++;
+            slide = window_size - offset;
+            offset = 0;
         }
+        else{
+
+            //position of seq wrt the beginning of the window
+            slide = seq - (win * window_size) + 1;
+            slide -= offset;
+            offset += slide;
+        }
+
+		//clean the part of the buffer dedicated to that window and increase window number
+    	if((start_pos += slide) >= sliding_window) {
+
+    		start_pos -= sliding_window;
+    	}
+    	if((end_pos += slide) >= sliding_window) {
+
+            end_pos -= sliding_window;
+    	}
+		
+        seq_with_no_ack -= slide;
+        last_ack = seq;
 	}
 }
 
@@ -299,6 +310,8 @@ void receive_reset(uint mailbox, uint port) {
 		seq_with_no_ack = 0;
 		index = 0;
         act_window = 0;
+        offset = 0;
+        last_ack = 0;
 	}
 }
 

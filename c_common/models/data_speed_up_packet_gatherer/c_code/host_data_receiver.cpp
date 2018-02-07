@@ -165,17 +165,18 @@ bool host_data_receiver::check(set<uint32_t> *received_seq_nums, uint32_t max_ne
 
 void host_data_receiver::send_ack(UDPConnection *sender, uint32_t window, uint32_t shift) {
 
-	uint32_t data_field[3];
+	uint32_t data_field[4];
 
 	//Used char array in order to modify it for selective ACK or for greater message
 	data_field[0] = ACK_MESSAGE_CODE;
 	data_field[1] = window;
 	data_field[2] = shift;
+	data_field[3] = window/this->window_size;
 
     SDPMessage message = SDPMessage(
         this->chip_x, this->chip_y, this->chip_p, 1,
         SDPMessage::REPLY_NOT_EXPECTED, 255, 255,
-        255, 0, 0, (char *)data_field, 3*sizeof(uint32_t));
+        255, 0, 0, (char *)data_field, 4*sizeof(uint32_t));
 
     //Send ACK
     sender->send_data(message.convert_to_byte_array(), message.length_in_bytes());
@@ -185,8 +186,7 @@ void host_data_receiver::send_ack(UDPConnection *sender, uint32_t window, uint32
 // Function for processing each received packet and checking end of transmission
 void host_data_receiver::process_data(UDPConnection *sender, bool *finished,
 										set<uint32_t> *received_seq_nums, char *recvdata, int datalen,
-										uint32_t *received_seqs, set<uint32_t> **received_in_windows,
-										uint32_t *seq) {
+										set<uint32_t> **received_in_windows, uint32_t *seq, bool *half_ack) {
 
 	int length_of_data, i, j;
 	uint32_t last_mc_packet, first_packet_element, offset, true_data_length, seq_num;
@@ -231,10 +231,6 @@ void host_data_receiver::process_data(UDPConnection *sender, bool *finished,
 			memcpy(buffer+offset, recvdata+SEQUENCE_NUMBER_SIZE, (true_data_length-offset));
 		}
 
-		//Logaritmic operation, any way to get it faster?
-		if(received_seq_nums->find(seq_num) == received_seq_nums->end())
-			(*received_seqs)++;
-
 		received_seq_nums->insert(seq_num);
 
 		received_in_windows[seq_num/this->window_size]->insert(seq_num);
@@ -265,13 +261,13 @@ void host_data_receiver::process_data(UDPConnection *sender, bool *finished,
 
 				*finished = true;
 				send_ack(sender, seq_num, 1);
-
+				
 				return;
 			}
 		}
 
-		//Check if it is possible to shift the window
-		if(*received_seqs >= this->window_size) {
+		//Check if it is possible to shift the window(complexity of size() is constant(CPP reference))
+		if(received_seq_nums->size() >= this->window_size) {
 
 			//If last window
 			if(this->is_last) {
@@ -292,19 +288,21 @@ void host_data_receiver::process_data(UDPConnection *sender, bool *finished,
 				this->window_start += this->window_size;
 				this->window_end += this->window_size;
 				ack_sent = true;
-
+				*half_ack = false;
 			}
 		}
 
 		//Intermediate ack, window_size/3 is to avoid to saturate the network of acks
-		if(seq_num > *seq + 1 && !ack_sent && *seq < this->window_end && *seq > this->window_start+(this->window_size/3) && seq_num != 0) {
+		if(seq_num > *seq + 1 && !ack_sent && *seq < this->window_end && *seq > this->window_start && seq_num != 0 && !(*half_ack)) {
 
-			send_ack(sender, seq, 0);
+			send_ack(sender, *seq, 0);
+			*half_ack = true;
 		}
 	}
 	else {
 		//In case ACK has not been received
 		send_ack(sender, seq_num, 1);
+		*half_ack = false;
 	}
 
 	*seq = seq_num;
@@ -348,11 +346,11 @@ void host_data_receiver::processor_thread(UDPConnection *sender) {
 
 	char data[400];
 	int receivd = 0, timeoutcount = 0, datalen;
-	bool finished = false;
+	bool finished = false, half_ack = false;
 	set<uint32_t> *received_seq_nums = new set<uint32_t>;
 	set<uint32_t> **received_in_windows = new set<uint32_t> *[(int)ceil((float)this->max_seq_num/(float)(this->window_size))+1];
 	packet p;
-	uint32_t received_seqs = 0, payload, rst = 1, seq = 0;
+	uint32_t payload, rst = 1, seq = 0;
 
 
 	for(int i = 0 ; i < (int)ceil((float)this->max_seq_num/(float)(this->window_size))+1 ; i++)
@@ -364,7 +362,7 @@ void host_data_receiver::processor_thread(UDPConnection *sender) {
 
 		 	p = messqueue->pop();
 
-		 	process_data(sender, &finished, received_seq_nums, p.content, p.size, &received_seqs, received_in_windows, &seq);
+		 	process_data(sender, &finished, received_seq_nums, p.content, p.size, received_in_windows, &seq, &half_ack);
 
 		 }catch(TimeoutQueueException e) {
 
@@ -372,7 +370,6 @@ void host_data_receiver::processor_thread(UDPConnection *sender) {
 
 				this->pcr.thrown = true;
 				this->pcr.val = "Failed to hear from the machine. Please try removing firewalls";
-				//Verify
 				delete sender;
 				return;
 
@@ -392,7 +389,7 @@ void host_data_receiver::processor_thread(UDPConnection *sender) {
 		 	return;
 	}
 
-	miss_cnt -= received_seqs;
+	miss_cnt -= received_seq_nums->size();
 	//Send reset to confirm the completion of transmission
 	while(rst != 0) {
 

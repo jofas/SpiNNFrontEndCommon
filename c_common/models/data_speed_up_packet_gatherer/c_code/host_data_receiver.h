@@ -39,10 +39,10 @@ class host_data_receiver {
         uint32_t calculate_max_seq_num(uint32_t length);
         bool check(set<uint32_t> *received_seq_nums, uint32_t max_needed);
         void process_data(UDPConnection *sender, bool *finished, set<uint32_t> *received_seq_nums,
-        	char *recvdata, int datalen, uint32_t *received_seqs, set<uint32_t> **received_in_windows);
+        	char *recvdata, int datalen, set<uint32_t> **received_in_windows, uint32_t *seq, bool *half_ack);
         void reader_thread(UDPConnection *receiver);
         void processor_thread(UDPConnection *sender);
-        void send_ack(UDPConnection *sender, uint32_t window);
+        void send_ack(UDPConnection *sender, uint32_t window, uint32_t shift);
 
         //Type for the Parallel Queue
         typedef struct packet{
