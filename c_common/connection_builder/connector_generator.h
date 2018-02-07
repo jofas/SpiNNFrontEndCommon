@@ -91,9 +91,10 @@ class Cortical : public Base{
   private:
     Cortical(uint32_t *&);
     uint32_t m_probability;
-    uint16_t m_maxDistance;
+    uint16_t m_allowSelfConnections;
+
+    uint16_t m_minDistanceSquare;
     uint16_t m_maxDistanceSquare;
-    uint8_t m_allowSelfConnections;
 
     uint16_t m_prePerZone;
     uint16_t m_postPerZone;

@@ -132,10 +132,12 @@ ConnectionBuilder::ConnectorGenerator::Cortical::Cortical(uint32_t *&region){
     m_probability = (uint32_t)(*region);
     region++;
 //    io_printf(IO_BUF, "Cortical probability %u\n", m_probability);
-    m_allowSelfConnections = (uint8_t)(*region & 1);
+    m_allowSelfConnections = (uint16_t)((*region) & 1);
 //    io_printf(IO_BUF, "Cortical allow self %u\n", m_allowSelfConnections);
-    m_maxDistance = (uint16_t)((*region >> 1) & 0x7FFF);
-//    io_printf(IO_BUF, "Cortical max distance %u\n", m_maxDistance);
+
+    m_minDistanceSquare = (uint16_t)((*region >> 1) & 0x7FFF);
+//    io_printf(IO_BUF, "Cortical min distance %u\n", m_minDistanceSquare);
+
     m_maxDistanceSquare = (uint16_t)((*region >> 16) & 0xFFFF);
 //    io_printf(IO_BUF, "Cortical max dist sqr %u\n", m_maxDistanceSquare);
     region++;
@@ -245,20 +247,32 @@ unsigned int ConnectionBuilder::ConnectorGenerator::Cortical::Generate(
 
     uint16_t d2 = (post_comm_c - pre_comm_c) * (post_comm_c - pre_comm_c) + \
                   (post_comm_r - pre_comm_r) * (post_comm_r - pre_comm_r);
-    uint32_t dice_roll = rng.GetNext();
 
 //    io_printf(IO_BUF, "pre (%u, %u) => (%u, %u) ==? post (%u, %u) => (%u, %u)\n",
 //      pre_r, pre_c, pre_comm_r, pre_comm_c, post_r, post_c, post_comm_r, post_comm_c);
 //    io_printf(IO_BUF, "distance %u\n", d2);
+//    io_printf(IO_BUF, "distance %u\n", d2<<2);
+//    io_printf(IO_BUF, "min dist %u, max distance %u\n",
+//                m_minDistanceSquare, m_maxDistanceSquare);
 //    io_printf(IO_BUF, "\tdice roll %u < %u\n", dice_roll, m_probability);
 
-    if(d2 > m_maxDistanceSquare){
+    if((d2 << 2) > m_maxDistanceSquare){
       continue;
     }
+
+    if((d2 << 2) < m_minDistanceSquare){
+        continue;
+    }
+
+    uint32_t dice_roll = rng.GetNext();
+
+//    io_printf(IO_BUF, "roll %u, max_prob %u\n", dice_roll, m_probability);
 
     if(dice_roll > m_probability){
       continue;
     }
+
+
 
     indices[index_count] = post_idx - post_start;
     index_count++;
