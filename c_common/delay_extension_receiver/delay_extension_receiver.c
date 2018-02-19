@@ -43,10 +43,10 @@ void clear_memory(uint32_t memory_size, uint32_t *syn_mtx_addr){
 
 // Sends an acknowledgement response to an SDP
 static void send_ack_response(sdp_msg_t *msg) {
-//#ifdef DEBUG_MESSAGES
+#ifdef DEBUG_MESSAGES
     log_info("ACK to 0x%04x.%02u:%u,", msg->srce_addr,
              msg->srce_port &((1 << PORT_SHIFT) - 1), msg->srce_port >> PORT_SHIFT);
-//#endif
+#endif
 
     uint8_t *data = &msg->cmd_rc;
     data[0] = RC_OK;
