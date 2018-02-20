@@ -12,6 +12,8 @@
 
 //#define DEBUG_MESSAGES
 #define MAX_DELAY 16
+#define EXC 0
+#define INH 1
 
 #define _pack_id_delay(i, d) ((i & 0xFF) | ((d & 0xFF) << 8))
 
@@ -269,6 +271,14 @@ unsigned int ConnectionBuilder::MatrixGenerator::Static::WriteRow(uint32_t *syna
     //0 <- plastic-plastic word
     //NULL <- start of plastic-plastic region,
     //false <- not a plastic synapse
+#ifdef DEBUG_MESSAGES
+    if(synapseType == INH){
+        LOG_PRINT(LOG_LEVEL_INFO, "Inhibitory");
+    }else{
+        LOG_PRINT(LOG_LEVEL_INFO, "Excitatory");
+    }
+    LOG_PRINT(LOG_LEVEL_INFO, "word = 0x%08x, masked = 0x%08x", word, word & fixed_mask);
+#endif
     insert_sorted(word, start_of_static, fixed_mask, max_num_static,
                   0, NULL, 1, false, false);
     first_pass = false;

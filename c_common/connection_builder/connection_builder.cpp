@@ -399,11 +399,13 @@ bool ReadConnectionBuilderRegion(uint32_t **in_region,
 //#if LOG_LEVEL <= LOG_LEVEL_TRACE
   LOG_PRINT(LOG_LEVEL_INFO, "\tpre slice (%u, %u of %u)",
             pre_slice_start, pre_slice_start + pre_slice_count, num_pre_neurons);
-#ifdef DEBUG_MESSAGES
-  LOG_PRINT(LOG_LEVEL_INFO, "\tconnector type hash:%u, delay type hash:%u, weight type hash:%u", connector_type_hash, delay_type_hash, weight_type_hash);
-
   LOG_PRINT(LOG_LEVEL_INFO, "\tkey: %08x, mask: %08x, address delta: %u",
             pre_key, pre_mask, address_delta);
+
+#ifdef DEBUG_MESSAGES
+  LOG_PRINT(LOG_LEVEL_INFO,
+            "\tconnector type hash:%u, delay type hash:%u, weight type hash:%u",
+            connector_type_hash, delay_type_hash, weight_type_hash);
 
   LOG_PRINT(LOG_LEVEL_INFO, "\tpre slice (%u, %u of %u), post slice (%u, %u)",
             pre_slice_start, pre_slice_start + pre_slice_count, num_pre_neurons,

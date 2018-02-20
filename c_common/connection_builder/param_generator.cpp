@@ -130,10 +130,10 @@ void ConnectionBuilder::ParamGenerator::ConvKernel::Generate(
       output[i] = m_values[k_r*m_kernelWidth + k_c] >> (16-shift);
 //      LOG_PRINT(LOG_LEVEL_INFO, "val = %5.6k", output[i]);
     }
-    else {
-      LOG_PRINT(LOG_LEVEL_ERROR, "Kernel coordinates off range (%d, %d)",
-                k_r, k_c);
-    }
+//    else {
+//      LOG_PRINT(LOG_LEVEL_ERROR, "Kernel coordinates off range (%d, %d)",
+//                k_r, k_c);
+//    }
 
   }
 
