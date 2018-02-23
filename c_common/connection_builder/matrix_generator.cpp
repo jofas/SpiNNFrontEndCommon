@@ -183,7 +183,7 @@ void ConnectionBuilder::MatrixGenerator::Base::TraceInt(int32_t (&values)[512],
 //-----------------------------------------------------------------------------
 ConnectionBuilder::MatrixGenerator::Static::Static(uint32_t *&region) : Base(region)
 {
-  LOG_PRINT(LOG_LEVEL_INFO, "\t\tStatic synaptic matrix: signed? %u",
+  io_printf(IO_BUF, "\t\tStatic synaptic matrix: signed? %u\n",
     IsSignedWeight());
   is_static = true;
 }
@@ -311,8 +311,8 @@ ConnectionBuilder::MatrixGenerator::Plastic::Plastic(uint32_t *&region) : Base(r
   // m_SynapseTraceBytes = *region++;
   is_static = false;
   // // Round up to words
-  LOG_PRINT(LOG_LEVEL_INFO,
-        "\t\tPlastic synapse matrix: signed? %u, num synapse pre-trace words %u",
+  io_printf(IO_BUF,
+        "\t\tPlastic synapse matrix: signed? %u, num synapse pre-trace words %u\n",
         IsSignedWeight(), m_PreStateWords);
 
   // LOG_PRINT(LOG_LEVEL_INFO, "\t\tPlastic synaptic matrix: %u signed weights, %u bytes presynaptic state (%u words), %u bytes synapse trace",

@@ -19,7 +19,6 @@
 
 
 //#define DEBUG_MESSAGES
-#define SARK_HEAP 1
 
 // Namespaces
 using namespace Common;
@@ -397,12 +396,13 @@ bool ReadConnectionBuilderRegion(uint32_t **in_region,
   // Create RNG with this seed for this matrix
   MarsKiss64 rng(seed);
 //#if LOG_LEVEL <= LOG_LEVEL_TRACE
-  LOG_PRINT(LOG_LEVEL_INFO, "\tpre slice (%u, %u of %u)",
+
+  io_printf(IO_BUF, "\tpre slice (%u, %u of %u)\n",
             pre_slice_start, pre_slice_start + pre_slice_count, num_pre_neurons);
+#ifdef DEBUG_MESSAGES
   LOG_PRINT(LOG_LEVEL_INFO, "\tkey: %08x, mask: %08x, address delta: %u",
             pre_key, pre_mask, address_delta);
 
-#ifdef DEBUG_MESSAGES
   LOG_PRINT(LOG_LEVEL_INFO,
             "\tconnector type hash:%u, delay type hash:%u, weight type hash:%u",
             connector_type_hash, delay_type_hash, weight_type_hash);
@@ -435,13 +435,12 @@ bool ReadConnectionBuilderRegion(uint32_t **in_region,
 
   const auto connectorGenerator = g_ConnectorGeneratorFactory.Create(connector_type_hash, 
                                                      region, g_ConnectorGeneratorBuffer);
-
-  LOG_PRINT(LOG_LEVEL_INFO, "\t\tWeight");
-  const auto weightGenerator = g_ParamGeneratorFactory.Create(weight_type_hash, 
+  io_printf(IO_BUF, "\t\tWeight\n");
+  const auto weightGenerator = g_ParamGeneratorFactory.Create(weight_type_hash,
                                          region, g_WeightParamGeneratorBuffer);
 
-  LOG_PRINT(LOG_LEVEL_INFO, "\t\tDelay");
-  const auto delayGenerator = g_ParamGeneratorFactory.Create(delay_type_hash, 
+  io_printf(IO_BUF, "\t\tDelay\n");
+  const auto delayGenerator = g_ParamGeneratorFactory.Create(delay_type_hash,
                                          region, g_DelayParamGeneratorBuffer);
 
   *in_region = region;
@@ -567,22 +566,16 @@ bool ReadSDRAMData(uint32_t *params_address, uint32_t *syn_mtx_addr){
 
 //#ifdef DEBUG_MESSAGES
   LOG_PRINT(LOG_LEVEL_INFO, "Allocating up memory for tag %u", mem_tag);
-#if SARK_HEAP == 1
+
   LOG_PRINT(LOG_LEVEL_INFO, "%u bytes of free DTCM",
             sark_heap_max(sark.heap, ALLOC_LOCK));
-#else
-  LOG_PRINT(LOG_LEVEL_INFO, "%u bytes of free SDRAM",
-            sark_heap_max(sv->sdram_heap, ALLOC_LOCK));
-#endif
+
 
 //  LOG_PRINT(LOG_LEVEL_INFO, "idx/delay buffer size = %u bytes",
 //            (MAX_PRE_DELAY_ENTRIES*256)*sizeof(uint16_t) );
 
-#if SARK_HEAP == 1
+
   pre_delay_pairs = (uint16_t *)sark_xalloc(sark.heap,
-#else
-  pre_delay_pairs = (uint16_t *)sark_xalloc(sv->sdram_heap,
-#endif
                                (MAX_PRE_DELAY_ENTRIES*256)*sizeof(uint16_t),
                                 mem_tag, ALLOC_LOCK);
 
@@ -668,8 +661,7 @@ bool ReadSDRAMData(uint32_t *params_address, uint32_t *syn_mtx_addr){
       if( (build_flags[w] & edge_mask) != 0){
 //        LOG_PRINT(LOG_LEVEL_INFO, "0x%08x <=> 0x%08x", build_flags[w], edge_mask);
 
-        LOG_PRINT(LOG_LEVEL_INFO,
-        "\n\n= = = = = =\n\n");
+        io_printf(IO_BUF, "\n\n\n");
         if( !ReadConnectionBuilderRegion(&params_address, syn_mtx_addr,
                                          post_slice_start, post_slice_count,
                                          weight_scales, num_synapse_bits,
@@ -713,11 +705,7 @@ bool ReadSDRAMData(uint32_t *params_address, uint32_t *syn_mtx_addr){
   LOG_PRINT(LOG_LEVEL_INFO, "Freeing memory for tag %u", mem_tag);
 #endif
 
-#if SARK_HEAP == 1
   sark_xfree (sark.heap, pre_delay_pairs, ALLOC_LOCK);
-#else
-  sark_xfree (sv->sdram_heap, pre_delay_pairs, ALLOC_LOCK);
-#endif
   pre_delay_pairs = NULL;
 
 #ifdef DEBUG_MESSAGES

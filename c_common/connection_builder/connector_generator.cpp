@@ -19,7 +19,7 @@ ConnectionBuilder::ConnectorGenerator::AllToAll::AllToAll(uint32_t *&region)
 {
   m_AllowSelfConnections = *region++;
 
-  LOG_PRINT(LOG_LEVEL_INFO, "\t\tAll-to-all: Self conns: %u",
+  io_printf(IO_BUF, "\t\tAll-to-all: Self conns: %u\n",
             m_AllowSelfConnections);
 }
 //-----------------------------------------------------------------------------
@@ -62,7 +62,7 @@ ConnectionBuilder::ConnectorGenerator::Mapping::Mapping(uint32_t *&region){
 
     region++;
 
-    LOG_PRINT(LOG_LEVEL_INFO, "\t\tMapping:");
+    io_printf(IO_BUF, "\t\tMapping:\n");
     io_printf(IO_BUF,
      "\t\t\t\tShape %d, %d; channel %d, rowBits %d, channelBits %d, eventBits %u\n",
      m_width, m_height, m_channel, m_heightBits, m_channelBits, m_eventBits);
@@ -194,7 +194,7 @@ ConnectionBuilder::ConnectorGenerator::Cortical::Cortical(uint32_t *&region){
 //    io_printf(IO_BUF, "Cortical step post shape %u, %u\n",
 //              m_stepPostWidth, m_stepPostHeight);
 
-    LOG_PRINT(LOG_LEVEL_INFO, "\t\t\tCortical:");
+    io_printf(IO_BUF, "\t\tCortical:\n");
     io_printf(IO_BUF, "\t\t\t\tpre(%d, %d) => post(%d, %d)\n",
               m_preWidth, m_preHeight, m_postWidth, m_postHeight);
 //    io_printf(IO_BUF, "\t\t\t\tstart(%d, %d), step(%d, %d)\n",
@@ -321,7 +321,7 @@ ConnectionBuilder::ConnectorGenerator::Kernel::Kernel(uint32_t *&region){
     m_kernelHeight = (uint16_t)( (*region) & 0xFFFF );
     region++;
 
-    LOG_PRINT(LOG_LEVEL_INFO, "\t\t\tKernel:");
+    io_printf(IO_BUF, "\t\t\tKernel:\n");
     io_printf(IO_BUF, "\t\t\t\tpre(%d, %d) => post(%d, %d)\n",
               m_preWidth, m_preHeight, m_postWidth, m_postHeight);
 //    io_printf(IO_BUF, "\t\t\t\tkernel(%d, %d), start(%d, %d), step(%d, %d)\n",
@@ -409,7 +409,7 @@ unsigned int ConnectionBuilder::ConnectorGenerator::Kernel::Generate(
 //-----------------------------------------------------------------------------
 ConnectionBuilder::ConnectorGenerator::OneToOne::OneToOne(uint32_t *&)
 {
-  LOG_PRINT(LOG_LEVEL_INFO, "\t\tOne-to-one");
+  io_printf(IO_BUF, "\t\tOne-to-one\n");
 }
 //-----------------------------------------------------------------------------
 unsigned int ConnectionBuilder::ConnectorGenerator::OneToOne::Generate(
@@ -438,7 +438,7 @@ unsigned int ConnectionBuilder::ConnectorGenerator::OneToOne::Generate(
    m_AllowSelfConnections = *region++;
    m_Probability = *region++;
 
-   LOG_PRINT(LOG_LEVEL_INFO, "\t\tFixed-probability: prob: %u",
+   io_printf(IO_BUF, "\t\tFixed-probability: prob: %u\n",
      m_Probability);
  }
  //-----------------------------------------------------------------------------
