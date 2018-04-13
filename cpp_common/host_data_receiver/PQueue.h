@@ -10,52 +10,50 @@
 
 using namespace std::literals::chrono_literals;
 
-/// Exception throw when the queue times out
-struct TimeoutQueueException: public std::exception {
+struct TimeoutQueueException : public std::exception {
+
+
 };
 
-/// A simple thread-aware queue that supports one writer and one reader
-template<typename T>
+template <typename T>
 class PQueue {
-    /// How long to wait for the queue to have an element in it
-    static constexpr auto const& TIMEOUT = 10 * 100ms;
 
-public:
-    /// Retrieve a value from the queue, or timeout with an exception
-    T pop()
-    {
-	std::unique_lock<std::mutex> mlock(mutex);
+ public:
 
-	while (queue.empty()) {
-	    if (cond.wait_for(mlock, TIMEOUT) == std::cv_status::timeout) {
-		throw TimeoutQueueException();
-	    }
-        }
+  T pop() {
 
-        auto val = std::move(queue.front());
-        queue.pop();
+    std::unique_lock<std::mutex> mlock(mutex_);
 
-        return val;
+    while (queue_.empty()){
+
+      if((cond_.wait_for(mlock, 10*100ms)) == cv_status::timeout)
+        throw TimeoutQueueException();
     }
 
-    /// Add an item to the queue
-    void push(const T& item) {
-        std::unique_lock<std::mutex> mlock(mutex);
-        queue.push(std::move(item));
-        cond.notify_one();
-    }
+    auto val = queue_.front();
+    queue_.pop();
 
-    PQueue() = default;
-    PQueue(const PQueue&) = delete;            // disable copying
-    PQueue& operator=(const PQueue&) = delete; // disable assignment
+    return val;
+  }
 
-private:
-    /// The implemetation of the queue
-    std::queue<T> queue;
-    /// The lock on the queue
-    std::mutex mutex;
-    /// The condition variable used to signal that an item was added
-    std::condition_variable cond;
+  void push(const T& item){
+
+    std::unique_lock<std::mutex> mlock(mutex_);
+    queue_.push(item);
+    mlock.unlock();
+    cond_.notify_one();
+  }
+
+  PQueue()=default;
+  PQueue(const PQueue&) = delete;            // disable copying
+  PQueue& operator=(const PQueue&) = delete; // disable assignment
+
+ private:
+
+  std::queue<T> queue_;
+  std::mutex mutex_;
+  std::condition_variable cond_;
+
 };
 
 #endif
