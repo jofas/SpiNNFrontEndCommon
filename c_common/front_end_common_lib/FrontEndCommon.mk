@@ -37,7 +37,7 @@ OBJECTS += $(OBJS)
 
 LIBRARIES += -lspinn_frontend_common -lspinn_common -lm
 FEC_DEBUG := PRODUCTION_CODE
-PROFILER := PROFILER_ENABLED
+PROFILER := PROFILER_DISABLED
 
 # Run md5sum on application name and extract first 8 bytes
 SHELL = bash
