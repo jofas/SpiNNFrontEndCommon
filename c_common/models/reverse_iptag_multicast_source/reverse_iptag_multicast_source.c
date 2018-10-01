@@ -1093,6 +1093,11 @@ void timer_callback(uint unused0, uint unused1) {
         last_request_tick = time;
     }
 
+//    //  Delay packet sending until well after neuron update has finished
+//    while (tc[T1_COUNT] > 100000) {
+//        // Do Nothing
+//    }
+
     if (!msg_from_sdram_in_use) {
         fetch_and_process_packet();
     } else if (next_buffer_time < time) {
