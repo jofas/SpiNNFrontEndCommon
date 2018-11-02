@@ -85,39 +85,55 @@ class BufferedReceivingData(object):
             sql = f.read()
         self._db.executescript(sql)
 
-    def __append_contents(self, cursor, x, y, p, region, contents):
+    def __region_id(self, cursor, x, y, p, region):
         cursor.execute(
-            "INSERT INTO storage(x, y, processor, region, content) "
-            + "VALUES(?, ?, ?, ?, ?) "
-            + "ON CONFLICT(x, y, processor, region) DO "
-            + "UPDATE SET content = storage.content || excluded.content",
-            (x, y, p, region, sqlite3.Binary(contents)))
+            "INSERT OR IGNORE INTO regions(x, y, processor, region) "
+            "VALUES(?, ?, ?, ?)", (x, y, p, region))
+        reg_id = cursor.lastrowid
+        if reg_id is None:
+            for row in cursor.execute(
+                    "SELECT global_region_id FROM regions "
+                    "WHERE x = ? AND y = ? AND processor = ? AND region = ?",
+                    (x, y, p, region)):
+                reg_id = row["global_region_id"]
+                break
+        return reg_id
+
+    def __append_contents(self, cursor, x, y, p, region, contents):
+        reg_id = self.__region_id(cursor, x, y, p, region)
+        cursor.execute(
+            "INSERT INTO storage(global_region_id, content) VALUES (?, ?) "
+            "ON CONFLICT(global_region_id) DO UPDATE "
+            "SET content = storage.content || excluded.content",
+            (reg_id, sqlite3.Binary(contents)))
 
     def __hacky_append(self, cursor, x, y, p, region, contents):
         """ Used to do an UPSERT when the version of SQLite used by Python\
             doesn't support the correct syntax for it (because it is older\
             than 3.24). Not really a problem with Python 3.6 or later.
         """
+        reg_id = self.__region_id(cursor, x, y, p, region)
         cursor.execute(
-            "INSERT OR IGNORE INTO storage(x, y, processor, region, content) "
-            + "VALUES(?, ?, ?, ?, ?)",
-            (x, y, p, region, sqlite3.Binary(b"")))
+            "INSERT OR IGNORE INTO storage(global_region_id, content) "
+            "VALUES(?, ?)",
+            (reg_id, sqlite3.Binary(b"")))
         cursor.execute(
             "UPDATE storage SET content = content || ? "
-            + "WHERE x = ? AND y = ? AND processor = ? AND region = ?",
-            (sqlite3.Binary(contents), x, y, p, region))
+            "WHERE global_region_id = ?",
+            (sqlite3.Binary(contents), reg_id))
 
     def _read_contents(self, cursor, x, y, p, region):
+        reg_id = self.__region_id(cursor, x, y, p, region)
         for row in cursor.execute(
-                "SELECT content FROM storage "
-                + "WHERE x = ? AND y = ? AND processor = ? AND region = ?",
-                (x, y, p, region)):
+                "SELECT content FROM storage WHERE global_region_id = ?",
+                (reg_id, )):
             return row["content"]
         return b""
 
     def __delete_contents(self, cursor, x, y, p, region):
         cursor.execute(
-            "DELETE FROM storage WHERE " +
+            "DELETE FROM storage WHERE global_region_id IN "
+            "SELECT global_region_id FROM regions WHERE "
             "x = ? AND y = ? AND processor = ? AND region = ?",
             (x, y, p, region))
 
