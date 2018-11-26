@@ -58,8 +58,7 @@ def get_profiling_data(profile_region, tag_labels, txrx, placement):
     :param tag_labels: labels for the profiling data
     :param txrx: SpiNNMan transceiver
     :param placement: placement
-    :return: ProfileData
-    """
+    :return: ProfileData    """
 
     profile_data = ProfileData(tag_labels)
 

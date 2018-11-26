@@ -5,6 +5,8 @@ from spinn_front_end_common.interface.profiling import AbstractHasProfileData
 
 import os
 import logging
+import numpy as np
+
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +43,15 @@ class ProfileDataGatherer(object):
 
     def _write(self, p, profile_data, run_time_ms,
                machine_time_step_ms, directory):
+        import numpy as np
+        if 'target_pop' in p.vertex.label:
+            master_profiles = np.load('/home/rjames/SpiNNaker_devel/PyNN8Examples/examples/master_profiles.npz')
+            n_calls = np.append(master_profiles['n_calls'],(profile_data.get_n_calls('INCOMING_SPIKE'),profile_data.get_n_calls('DMA_READ')))
+            # spike_pro = np.append(master_profiles['spike_processing'],profile_data.get_mean_ms('INCOMING_SPIKE')*profile_data.get_n_calls('INCOMING_SPIKE'))
+            spike_pro = np.append(master_profiles['spike_processing'],profile_data.get_complete_profile('INCOMING_SPIKE'))
+            # dma_pro = np.append(master_profiles['dma_processing'],profile_data.get_mean_ms('DMA_READ')*profile_data.get_n_calls('DMA_READ'))
+            dma_pro = np.append(master_profiles['dma_processing'],profile_data.get_complete_profile('DMA_READ'))
+            np.savez('/home/rjames/SpiNNaker_devel/PyNN8Examples/examples/master_profiles.npz',spike_processing=spike_pro,dma_processing=dma_pro,n_calls=n_calls)
         # pylint: disable=too-many-arguments
         max_tag_len = max([len(tag) for tag in profile_data.tags])
 
@@ -55,13 +66,17 @@ class ProfileDataGatherer(object):
 
         # write profile data to file
         with open(file_name, mode) as f:
-            f.write("{: <{}s} {: <7s} {: <14s} {: <14s} {: <14s}\n".format(
-                "tag", max_tag_len, "n_calls", "mean_ms",
-                "n_calls_per_ts", "mean_ms_per_ts"))
-            f.write("{:-<{}s} {:-<7s} {:-<14s} {:-<14s} {:-<14s}\n".format(
-                "", max_tag_len, "", "", "", ""))
+            f.write("{: <{}s} {: <7s} {: <14s} {: <14s} {: <14s} "
+                    "{: <18s} {: <14s}\n".format("tag", max_tag_len,
+                    "n_calls", "mean_ms","n_calls_per_ts",
+                    "mean_ms_per_ts", "standard_deviation",
+                    "standard_error"))
+            f.write("{:-<{}s} {:-<7s} {:-<14s} {:-<14s} {:-<14s}"
+                    "{: <18s} {: <14s}\n".format(
+                    "", max_tag_len, "", "", "", "", "", ""))
             for tag in profile_data.tags:
-                f.write("{: <{}s} {: >7d} {: >14.6f} {: >14.6f} {: >14.6f}\n"
+                f.write("{: <{}s} {: >7d} {: >14.6f} {: >14.6f} {: >14.6f}"
+                        "{: >14.6f} {: >14.6f}\n"
                         .format(
                             tag, max_tag_len,
                             profile_data.get_n_calls(tag),
@@ -69,4 +84,7 @@ class ProfileDataGatherer(object):
                             profile_data.get_mean_n_calls_per_ts(
                                 tag, run_time_ms, machine_time_step_ms),
                             profile_data.get_mean_ms_per_ts(
-                                tag, run_time_ms, machine_time_step_ms)))
+                                tag, run_time_ms, machine_time_step_ms),
+                            profile_data.get_sd(tag),
+                            profile_data.get_se(tag)
+                        ))

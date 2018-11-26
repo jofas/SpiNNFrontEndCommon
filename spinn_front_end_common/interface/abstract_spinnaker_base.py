@@ -1879,10 +1879,13 @@ class AbstractSpinnakerBase(SimulatorInterface):
             run_complete = True
 
             # write provenance to file if necessary
+            # if (self._config.getboolean(
+            #         "Reports", "write_provenance_data") and
+            #         not self._use_virtual_board and
+            #         n_machine_time_steps is not None):
             if (self._config.getboolean(
                     "Reports", "write_provenance_data") and
-                    not self._use_virtual_board and
-                    n_machine_time_steps is not None):
+                    not self._use_virtual_board) :
                 prov_items = executor.get_item("ProvenanceItems")
                 prov_items.extend(self._pacman_provenance.data_items)
                 self._pacman_provenance.clear()
@@ -2041,9 +2044,11 @@ class AbstractSpinnakerBase(SimulatorInterface):
             algorithms.append("ChipIOBufExtractor")
 
         # add extractor of provenance if needed
+        # if (self._config.getboolean("Reports", "write_provenance_data") and
+        #         not self._use_virtual_board and
+        #         n_machine_time_steps is not None):
         if (self._config.getboolean("Reports", "write_provenance_data") and
-                not self._use_virtual_board and
-                n_machine_time_steps is not None):
+                not self._use_virtual_board):
             algorithms.append("PlacementsProvenanceGatherer")
             algorithms.append("RouterProvenanceGatherer")
             algorithms.append("ProfileDataGatherer")

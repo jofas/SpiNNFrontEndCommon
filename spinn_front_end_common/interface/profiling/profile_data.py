@@ -132,6 +132,8 @@ class ProfileData(object):
         :rtype: float
         """
         return numpy.average(self._tags[tag][_DURATION])
+    def get_max_ms(self,tag):
+        return numpy.max(self._tags[tag][_DURATION])
 
     def get_n_calls(self, tag):
         """ Get the number of times the given tag was recorded
@@ -181,3 +183,27 @@ class ProfileData(object):
         mean_per_ts[numpy.isnan(mean_per_ts)] = 0
         return numpy.average(
             mean_per_ts[numpy.logical_not(numpy.isnan(mean_per_ts))])
+
+    def get_sd(self,tag):
+        """ Get the standard deviation in milliseconds of measurements with the\
+            given tag
+
+        :param tag: The tag to get the sd of measurements for
+        :type tag: str
+        :rtype: float
+        """
+        return numpy.std(self._tags[tag][_DURATION])
+
+    def get_se(self,tag):
+        """ Get the standard error in milliseconds of measurements with the\
+            given tag
+
+        :param tag: The tag to get the sd of measurements for
+        :type tag: str
+        :rtype: float
+        """
+        return numpy.std(self._tags[tag][_DURATION]) / \
+               numpy.sqrt(self._tags[tag][_DURATION].size)
+
+    def get_complete_profile(self,tag):
+        return self._tags[tag][_DURATION]
