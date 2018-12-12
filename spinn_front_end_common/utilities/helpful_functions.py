@@ -82,7 +82,11 @@ def child_folder(parent, child_name):
     child = os.path.join(parent, child_name)
     if not os.path.exists(child):
         os.makedirs(child)
-    return child
+        return child
+    else:
+        child_name += "a"
+        child = child_folder(parent, child_name)
+        return child # never gets here... !
 
 
 def set_up_output_application_data_specifics(
