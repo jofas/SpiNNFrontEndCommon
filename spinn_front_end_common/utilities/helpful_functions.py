@@ -87,6 +87,7 @@ def child_folder(parent, child_name, time=0):
         child_name += "a"
         child = child_folder(parent, child_name)
         return child # never gets here... !
+    return child
 
 
 def set_up_output_application_data_specifics(
