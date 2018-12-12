@@ -85,7 +85,7 @@ def child_folder(parent, child_name, time=0):
         return child
     elif (time != 0):
         child_name += "a"
-        child = child_folder(parent, child_name)
+        child = child_folder(parent, child_name, time=1)
         return child # never gets here... !
     return child
 
