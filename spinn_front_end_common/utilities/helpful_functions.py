@@ -78,12 +78,12 @@ def locate_memory_region_for_placement(placement, region, transceiver):
     return _ONE_WORD.unpack_from(region_address)[0]
 
 
-def child_folder(parent, child_name):
+def child_folder(parent, child_name, time=0):
     child = os.path.join(parent, child_name)
     if not os.path.exists(child):
         os.makedirs(child)
         return child
-    else:
+    elif (time != 0):
         child_name += "a"
         child = child_folder(parent, child_name)
         return child # never gets here... !
@@ -112,7 +112,7 @@ def set_up_output_application_data_specifics(
         where_to_write_application_data_files, APP_DIRNAME)
     # add time stamped folder for this run
     this_run_time_folder = child_folder(
-        application_generated_data_file_folder, this_run_time_string)
+        application_generated_data_file_folder, this_run_time_string, time=1)
 
     # remove folders that are old and above the limit
     _remove_excess_folders(
@@ -177,7 +177,7 @@ def set_up_report_specifics(
 
     # handle timing app folder and cleaning of report folder from last run
     app_folder_name = child_folder(
-        report_default_directory, this_run_time_string)
+        report_default_directory, this_run_time_string, time=1)
 
     # create sub folder within reports for sub runs (where changes need to be
     # recorded)
