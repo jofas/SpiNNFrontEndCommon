@@ -81,12 +81,20 @@ def locate_memory_region_for_placement(placement, region, transceiver):
 def child_folder(parent, child_name, time=0):
     child = os.path.join(parent, child_name)
     if not os.path.exists(child):
-        os.makedirs(child)
-        return child
+        try:
+            os.makedirs(child)
+        except:
+            child = child_folder(parent, child_name, time=time+1)
     elif (time != 0):
-        child_name += "a"
-        child = child_folder(parent, child_name, time=1)
-        return child # never gets here... !
+        if (time == 1):
+            child_name += "_"+str(time)
+        elif (time < 11):
+            child_name = child_name[:-2]+"_"+str(time)
+        elif (time < 101):
+            child_name = child_name[:-3]+"_"+str(time)
+        else:
+            child_name = child_name[:-4]+"_"+str(time)
+        child = child_folder(parent, child_name, time=time+1)
     return child
 
 
@@ -210,10 +218,17 @@ def _remove_excess_folders(max_to_keep, starting_directory):
     # while there's more than the valid max, remove the oldest one
     if len(files_in_report_folder) > max_to_keep:
 
-        # sort files into time frame
-        files_in_report_folder.sort(
-            key=lambda temp_file:
-            os.path.getmtime(os.path.join(starting_directory, temp_file)))
+        # another thread may have deleted this directory already
+        try:
+            # sort files into time frame
+            files_in_report_folder.sort(
+                key=lambda temp_file:
+                os.path.getmtime(os.path.join(starting_directory, temp_file)))
+        except:
+            # a different thread deleted this directory
+            logger.warning("Tried to list {} in {} but failed",
+                           temp_file, starting_directory)
+            return
 
         # remove only the number of files required, and only if they have
         # the finished flag file created
@@ -224,9 +239,13 @@ def _remove_excess_folders(max_to_keep, starting_directory):
             finished_flag = os.path.join(os.path.join(
                 starting_directory, current_oldest_file), FINISHED_FILENAME)
             if os.path.exists(finished_flag):
-                shutil.rmtree(
-                    os.path.join(starting_directory, current_oldest_file),
-                    ignore_errors=True)
+                try:
+                    shutil.rmtree(
+                        os.path.join(starting_directory, current_oldest_file),
+                        ignore_errors=True)
+                except:
+                    logger.warning("Tried to remove {} in {} but failed",
+                                    current_oldest_file, starting_directory)
                 files_removed += 1
             else:
                 files_not_closed += 1
