@@ -226,8 +226,8 @@ def _remove_excess_folders(max_to_keep, starting_directory):
                 os.path.getmtime(os.path.join(starting_directory, temp_file)))
         except:
             # a different thread deleted this directory
-            logger.warning("Tried to list {} in {} but failed",
-                           temp_file, starting_directory)
+            logger.warning("Tried to list {} files in {} but failed",
+                           len(files_in_report_folder), starting_directory)
             return
 
         # remove only the number of files required, and only if they have
@@ -245,7 +245,7 @@ def _remove_excess_folders(max_to_keep, starting_directory):
                         ignore_errors=True)
                 except:
                     logger.warning("Tried to remove {} in {} but failed",
-                                    current_oldest_file, starting_directory)
+                                   current_oldest_file, starting_directory)
                 files_removed += 1
             else:
                 files_not_closed += 1
