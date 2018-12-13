@@ -83,7 +83,7 @@ def child_folder(parent, child_name, time=0):
     if not os.path.exists(child):
         try:
             os.makedirs(child)
-        except:
+        except OSError:
             child = child_folder(parent, child_name, time=time+1)
     elif (time != 0):
         if (time == 1):
@@ -224,7 +224,7 @@ def _remove_excess_folders(max_to_keep, starting_directory):
             files_in_report_folder.sort(
                 key=lambda temp_file:
                 os.path.getmtime(os.path.join(starting_directory, temp_file)))
-        except:
+        except OSError:
             # a different thread deleted this directory
             logger.warning("Tried to list {} files in {} but failed",
                            len(files_in_report_folder), starting_directory)
@@ -243,7 +243,7 @@ def _remove_excess_folders(max_to_keep, starting_directory):
                     shutil.rmtree(
                         os.path.join(starting_directory, current_oldest_file),
                         ignore_errors=True)
-                except:
+                except OSError:
                     logger.warning("Tried to remove {} in {} but failed",
                                    current_oldest_file, starting_directory)
                 files_removed += 1
