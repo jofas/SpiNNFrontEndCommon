@@ -26,7 +26,7 @@ class EdgeToNKeysMapper(object):
                 "Can only do one graph. semantically doing 2 graphs makes no "
                 "sense. Please choose and try again")
 
-        if application_graph is not None:
+        if 0:#application_graph is not None:#TODO: put in condition here to see if spinnakear is present?
             # generate progress bar
             progress = ProgressBar(
                 machine_graph.n_vertices,

@@ -822,7 +822,7 @@ class AbstractSpinnakerBase(SimulatorInterface):
                 self._application_graph.add_edge(
                     edge, outgoing_partition.identifier)
         # sort out machine graph
-        self._machine_graph = MachineGraph(
+        self._machine_graph = MachineGraph( #TODO: why does this get called before I build the "original machine graph"
             label=self._original_machine_graph.label)
         for vertex in self._original_machine_graph.vertices:
             self._machine_graph.add_vertex(vertex)
@@ -909,7 +909,7 @@ class AbstractSpinnakerBase(SimulatorInterface):
 
             # Reset the machine graph if there is an application graph
             if self._application_graph.n_vertices:
-                self._machine_graph = MachineGraph(self._graph_label)
+                self._machine_graph = MachineGraph(self._graph_label) # TODO: this may break my SpiNNakEar stuff...
                 self._graph_mapper = None
 
             # Reset the machine if the graph has changed
@@ -2420,10 +2420,10 @@ class AbstractSpinnakerBase(SimulatorInterface):
         :raises: ConfigurationException when both graphs contain vertices
         """
         # check that there's no application vertices added so far
-        if self._original_application_graph.n_vertices > 0:
-            raise ConfigurationException(
-                "Cannot add vertices to both the machine and application"
-                " graphs")
+        # if self._original_application_graph.n_vertices > 0:
+        #     raise ConfigurationException(
+        #         "Cannot add vertices to both the machine and application"
+        #         " graphs")
         self._original_machine_graph.add_vertex(vertex)
 
     def add_application_edge(self, edge_to_add, partition_identifier):
