@@ -4,7 +4,7 @@ from pacman.model.routing_info import DictBasedMachinePartitionNKeysMap
 from spinn_front_end_common.abstract_models import (
     AbstractProvidesNKeysForPartition)
 from spinn_front_end_common.utilities.exceptions import ConfigurationException
-
+from spinnakear_vertex import SpiNNakEarVertex
 
 class EdgeToNKeysMapper(object):
     """ Works out the number of keys needed for each edge.
@@ -26,7 +26,7 @@ class EdgeToNKeysMapper(object):
                 "Can only do one graph. semantically doing 2 graphs makes no "
                 "sense. Please choose and try again")
 
-        if 0:#application_graph is not None:#TODO: put in condition here to see if spinnakear is present?
+        if application_graph is not None:#TODO: put in condition here to see if spinnakear is present?
             # generate progress bar
             progress = ProgressBar(
                 machine_graph.n_vertices,
@@ -66,6 +66,8 @@ class EdgeToNKeysMapper(object):
             partition.pre_vertex)
         vertex = graph_mapper.get_application_vertex(
             partition.pre_vertex)
+        if isinstance(vertex,SpiNNakEarVertex):
+            vertex = vertex._mv_list[vertex_slice.lo_atom]
 
         if isinstance(vertex, AbstractProvidesNKeysForPartition):
             n_keys = vertex.get_n_keys_for_partition(partition, graph_mapper)
