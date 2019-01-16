@@ -5,6 +5,7 @@ from spinn_front_end_common.abstract_models import (
     AbstractProvidesNKeysForPartition)
 from spinn_front_end_common.utilities.exceptions import ConfigurationException
 from spinnakear_vertex import SpiNNakEarVertex
+from IHCAN_vertex import IHCANVertex
 
 class EdgeToNKeysMapper(object):
     """ Works out the number of keys needed for each edge.
@@ -67,7 +68,11 @@ class EdgeToNKeysMapper(object):
         vertex = graph_mapper.get_application_vertex(
             partition.pre_vertex)
         if isinstance(vertex,SpiNNakEarVertex):
-            vertex = vertex._mv_list[vertex_slice.lo_atom]
+            if isinstance(partition.pre_vertex,IHCANVertex):
+                ihc_ids = [i for i, name in enumerate(vertex._mv_index_list) if name == 'ihc']
+                vertex = vertex._mv_list[ihc_ids[vertex_slice.lo_atom/2]]
+            else:
+                vertex = vertex._mv_list[vertex_slice.lo_atom]
 
         if isinstance(vertex, AbstractProvidesNKeysForPartition):
             n_keys = vertex.get_n_keys_for_partition(partition, graph_mapper)
