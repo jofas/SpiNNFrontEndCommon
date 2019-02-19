@@ -69,14 +69,7 @@ class EdgeToNKeysMapper(object):
         vertex = graph_mapper.get_application_vertex(
             partition.pre_vertex)
         if isinstance(vertex,SpiNNakEarVertex):
-            # if isinstance(partition.pre_vertex,IHCANVertex):
-            #     ihc_ids = [i for i, name in enumerate(vertex._mv_index_list) if name == 'ihc']
-            #     vertex = vertex._mv_list[ihc_ids[vertex_slice.lo_atom/2]]
-            if isinstance(partition.pre_vertex,ANGroupVertex):
-                group_ids = [i for i, name in enumerate(vertex._mv_index_list) if name == 'group']
-                vertex = vertex._mv_list[group_ids[vertex_slice.lo_atom/vertex._MAX_N_ATOMS_PER_CORE]]
-            else:
-                vertex = vertex._mv_list[vertex_slice.lo_atom]
+            vertex = partition.pre_vertex
 
         if isinstance(vertex, AbstractProvidesNKeysForPartition):
             n_keys = vertex.get_n_keys_for_partition(partition, graph_mapper)
