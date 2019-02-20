@@ -348,6 +348,7 @@ class DatabaseWriter(object):
         :param application_graph: the application graph object
         :rtype: None
         """
+        none_app_edge_count = 0
         with self._connection:
             for vertex in machine_graph.vertices:
                 req = vertex.resources_required
@@ -371,10 +372,15 @@ class DatabaseWriter(object):
                         app_vertex, machine_vertex,
                         graph_mapper.get_slice(machine_vertex))
 
-                # add graph_mapper edges
-                for edge in machine_graph.edges:
-                    self.__insert_graph_mapper_edge(
-                        graph_mapper.get_application_edge(edge), edge)
+                    # add graph_mapper edges
+                    for edge in machine_graph.edges:
+                        app_edge = graph_mapper.get_application_edge(edge)
+                        if app_edge is None:
+                            none_app_edge_count += 1
+                        else:
+                            self.__insert_graph_mapper_edge(
+                                app_edge, edge)
+                print "None app edge count: {}".format(none_app_edge_count)
 
     def add_placements(self, placements):
         """ Adds the placements objects into the database
