@@ -2106,24 +2106,33 @@ class AbstractSpinnakerBase(SimulatorInterface):
 
         # Print the details of error cores
         for (x, y, p), core_info in iteritems(unsuccessful_cores):
+            output_file = open(self._provenance_file_path + "/problem_cores.txt", 'a+')
             state = core_info.state
             rte_state = ""
             if state == CPUState.RUN_TIME_EXCEPTION:
                 rte_state = " ({})".format(core_info.run_time_error.name)
-            logger.error("{}, {}, {}: {}{} {}".format(
-                x, y, p, state.name, rte_state, core_info.application_name))
+            error_string = "{}, {}, {}: {}{} {}".format(
+                x, y, p, state.name, rte_state, core_info.application_name)
+            logger.error(error_string)
+            output_file.write(error_string + '\n')
+
             if core_info.state == CPUState.RUN_TIME_EXCEPTION:
-                logger.error(
-                    "r0=0x{:08X} r1=0x{:08X} r2=0x{:08X} r3=0x{:08X}".format(
+                reg_string = "r0=0x{:08X} r1=0x{:08X} r2=0x{:08X} r3=0x{:08X}".format(
                         core_info.registers[0], core_info.registers[1],
-                        core_info.registers[2], core_info.registers[3]))
-                logger.error(
-                    "r4=0x{:08X} r5=0x{:08X} r6=0x{:08X} r7=0x{:08X}".format(
+                        core_info.registers[2], core_info.registers[3])
+                logger.error(reg_string)
+                output_file.write(reg_string + '\n')
+                reg_string = "r4=0x{:08X} r5=0x{:08X} r6=0x{:08X} r7=0x{:08X}".format(
                         core_info.registers[4], core_info.registers[5],
-                        core_info.registers[6], core_info.registers[7]))
-                logger.error("PSR=0x{:08X} SR=0x{:08X} LR=0x{:08X}".format(
+                        core_info.registers[6], core_info.registers[7])
+                logger.error(reg_string)
+                output_file.write(reg_string + '\n')
+                reg_string = "PSR=0x{:08X} SR=0x{:08X} LR=0x{:08X}".format(
                     core_info.processor_state_register,
-                    core_info.stack_pointer, core_info.link_register))
+                    core_info.stack_pointer, core_info.link_register)
+                logger.error(reg_string)
+                output_file.write(reg_string + '\n')
+            output_file.write('\n')
 
         # Find the cores that are not in RTE i.e. that can still be read
         non_rte_cores = [
