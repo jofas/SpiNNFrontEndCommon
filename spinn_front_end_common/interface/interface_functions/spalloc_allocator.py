@@ -89,7 +89,7 @@ class SpallocAllocator(object):
 
         # If the number of boards rounded up is less than 10% of a board bigger
         # than the actual number of boards, add another board just in case.
-        if math.ceil(n_boards) - n_boards < 0.2:
+        if math.ceil(n_boards) - n_boards < 0.5:
             n_boards += 2
         n_boards = int(math.ceil(n_boards))
 

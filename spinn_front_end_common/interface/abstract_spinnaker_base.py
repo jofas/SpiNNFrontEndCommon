@@ -1917,6 +1917,7 @@ class AbstractSpinnakerBase(SimulatorInterface):
             # if in debug mode, do not shut down machine
             if self._config.get("Mode", "mode") != "Debug":
                 try:
+                    #python read_line return prompt
                     self.stop(
                         turn_off_machine=False, clear_routing_tables=False,
                         clear_tags=False)
