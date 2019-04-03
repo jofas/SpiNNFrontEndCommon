@@ -1449,12 +1449,12 @@ class AbstractSpinnakerBase(SimulatorInterface):
 
         self._turn_off_on_board_to_save_power("turn_off_board_after_discovery")
 
-        if self._n_chips_required:
-            if self._machine.n_chips < self._n_chips_required:
-                raise ConfigurationException(
-                    "Failure to detect machine of with {} chips as requested. "
-                    "Only found {}".format(self._n_chips_required,
-                                           self._machine))
+        # if self._n_chips_required:
+        #     if self._machine.n_chips < self._n_chips_required:
+        #         raise ConfigurationException(
+        #             "Failure to detect machine of with {} chips as requested. "
+        #             "Only found {}".format(self._n_chips_required,
+        #                                    self._machine))
 
         return self._machine
 
@@ -1917,6 +1917,10 @@ class AbstractSpinnakerBase(SimulatorInterface):
             # if in debug mode, do not shut down machine
             if self._config.get("Mode", "mode") != "Debug":
                 try:
+                    command = raw_input("Type 'switch-off' to turn off SpiNNaker machine...")
+                    while (command != "switch-off"):
+                        command = raw_input("Type 'switch-off' to turn off SpiNNaker machine...")
+
                     #python read_line return prompt
                     self.stop(
                         turn_off_machine=False, clear_routing_tables=False,
