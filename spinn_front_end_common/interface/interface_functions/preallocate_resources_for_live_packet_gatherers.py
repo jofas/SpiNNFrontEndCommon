@@ -8,17 +8,17 @@ from spinn_front_end_common.utility_models import (
     LPG)
 
 
-class PreAllocateResourcesForLivePacketGatherers(object):
+class PreallocateResourcesForLivePacketGatherers(object):
     """ Adds Live Packet Gatherer resources as required for a machine
     """
 
     def __call__(
             self, live_packet_gatherer_parameters, machine,
-            pre_allocated_resources=None):
+            preallocated_resources=None):
         """
         :param live_packet_gatherer_parameters:\
             the LPG parameters requested by the script
-        :param previous_allocated_resources: other preallocated resources
+        :param preallocated_resources: other preallocated resources
         :param machine: the SpiNNaker machine as discovered
         :return: preallocated resources
         """
@@ -41,16 +41,16 @@ class PreAllocateResourcesForLivePacketGatherers(object):
                 sdrams, cores, iptags)
 
         # create preallocated resource container
-        lpg_prealloc_resource_container = PreAllocatedResourceContainer(
+        resource_container = PreAllocatedResourceContainer(
             specific_sdram_usage=sdrams, core_resources=cores,
             specific_iptag_resources=iptags)
 
         # add other preallocated resources
-        if pre_allocated_resources is not None:
-            lpg_prealloc_resource_container.extend(pre_allocated_resources)
+        if preallocated_resources is not None:
+            resource_container.extend(preallocated_resources)
 
         # return preallocated resources
-        return lpg_prealloc_resource_container
+        return resource_container
 
     @staticmethod
     def _add_chip_lpg_reqs(

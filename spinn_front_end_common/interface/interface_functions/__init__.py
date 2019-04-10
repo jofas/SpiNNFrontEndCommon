@@ -35,12 +35,12 @@ from .machine_execute_data_specification import (
 from .machine_generator import MachineGenerator
 from .notification_protocol import NotificationProtocol
 from .placements_provenance_gatherer import PlacementsProvenanceGatherer
-from .pre_allocate_resources_for_chip_power_monitor import (
-    PreAllocateResourcesForChipPowerMonitor)
-from .pre_allocate_resources_for_live_packet_gatherers import (
-    PreAllocateResourcesForLivePacketGatherers)
+from .preallocate_resources_for_chip_power_monitor import (
+    PreallocateResourcesForChipPowerMonitor)
+from .preallocate_resources_for_live_packet_gatherers import (
+    PreallocateResourcesForLivePacketGatherers)
 from .preallocate_resources_for_extra_monitor_support import (
-    PreAllocateResourcesForExtraMonitorSupport)
+    PreallocateResourcesForExtraMonitorSupport)
 from .process_partition_constraints import ProcessPartitionConstraints
 from .profile_data_gatherer import ProfileDataGatherer
 from .provenance_json_writer import ProvenanceJSONWriter
@@ -73,9 +73,9 @@ __all__ = [
     "LoadExecutableImages", "LocateExecutableStartType", "LoadFixedRoutes",
     "MachineExecuteDataSpecification", "MachineGenerator",
     "NotificationProtocol", "PlacementsProvenanceGatherer",
-    "PreAllocateResourcesForChipPowerMonitor",
-    "PreAllocateResourcesForExtraMonitorSupport",
-    "PreAllocateResourcesForLivePacketGatherers",
+    "PreallocateResourcesForChipPowerMonitor",
+    "PreallocateResourcesForExtraMonitorSupport",
+    "PreallocateResourcesForLivePacketGatherers",
     "ProcessPartitionConstraints", "ProfileDataGatherer",
     "ProvenanceJSONWriter", "ProvenanceXMLWriter",
     "RouterProvenanceGatherer", "RoutingSetup",

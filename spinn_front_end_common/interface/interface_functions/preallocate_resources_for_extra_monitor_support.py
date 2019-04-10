@@ -8,19 +8,18 @@ from spinn_front_end_common.utility_models import (
     DataSpeedUpPacketGatherMachineVertex)
 
 
-class PreAllocateResourcesForExtraMonitorSupport(object):
+class PreallocateResourcesForExtraMonitorSupport(object):
     def __call__(
-            self, machine, pre_allocated_resources=None,
+            self, machine, preallocated_resources=None,
             n_cores_to_allocate=1):
         """
         :param machine: SpiNNaker machine object
-        :param pre_allocated_resources: resources already pre allocated
+        :param preallocated_resources: resources already pre allocated
         :param n_cores_to_allocate: config params for how many gatherers to use
         """
-
         progress = ProgressBar(
             len(list(machine.ethernet_connected_chips)) + machine.n_chips,
-            "Pre allocating resources for Extra Monitor support vertices")
+            "Preallocating resources for Extra Monitor support vertices")
 
         sdrams = list()
         cores = list()
@@ -36,16 +35,16 @@ class PreAllocateResourcesForExtraMonitorSupport(object):
         self._handle_second_monitor_support(cores, sdrams, machine, progress)
 
         # create pre allocated resource container
-        extra_monitor_pre_allocations = PreAllocatedResourceContainer(
+        resource_container = PreAllocatedResourceContainer(
             specific_sdram_usage=sdrams, core_resources=cores,
             specific_iptag_resources=tags)
 
         # add other pre allocated resources
-        if pre_allocated_resources is not None:
-            extra_monitor_pre_allocations.extend(pre_allocated_resources)
+        if preallocated_resources is not None:
+            resource_container.extend(preallocated_resources)
 
         # return pre allocated resources
-        return extra_monitor_pre_allocations
+        return resource_container
 
     @staticmethod
     def _handle_second_monitor_support(cores, sdrams, machine, progress):

@@ -5,16 +5,16 @@ from spinn_front_end_common.utility_models import (
     ChipPowerMonitorMachineVertex)
 
 
-class PreAllocateResourcesForChipPowerMonitor(object):
+class PreallocateResourcesForChipPowerMonitor(object):
     """ Adds chip power monitor resources as required for a machine
     """
 
     def __call__(
             self, machine, n_machine_time_steps, n_samples_per_recording,
             sampling_frequency, time_scale_factor, machine_time_step,
-            pre_allocated_resources=None):
+            preallocated_resources=None):
         """
-        :param pre_allocated_resources: other preallocated resources
+        :param preallocated_resources: other preallocated resources
         :param machine: the SpiNNaker machine as discovered
         :param n_machine_time_steps: the number of machine\
             time steps used by the simulation during this phase
@@ -47,13 +47,12 @@ class PreAllocateResourcesForChipPowerMonitor(object):
             cores.append(CoreResource(chip, 1))
 
         # create preallocated resource container
-        cpm_pre_allocated_resource_container = PreAllocatedResourceContainer(
+        resources = PreAllocatedResourceContainer(
             specific_sdram_usage=sdrams, core_resources=cores)
 
         # add other preallocated resources
-        if pre_allocated_resources is not None:
-            cpm_pre_allocated_resource_container.extend(
-                pre_allocated_resources)
+        if preallocated_resources is not None:
+            resources.extend(preallocated_resources)
 
         # return preallocated resources
-        return cpm_pre_allocated_resource_container
+        return resources
