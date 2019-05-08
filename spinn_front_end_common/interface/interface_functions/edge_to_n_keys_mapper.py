@@ -5,8 +5,6 @@ from spinn_front_end_common.abstract_models import (
     AbstractProvidesNKeysForPartition)
 from spinn_front_end_common.utilities.exceptions import ConfigurationException
 from spinnak_ear.spinnakear_vertex import SpiNNakEarVertex
-from spinnak_ear.IHCAN_vertex import IHCANVertex
-from spinnak_ear.AN_group_vertex import ANGroupVertex
 
 class EdgeToNKeysMapper(object):
     """ Works out the number of keys needed for each edge.
