@@ -799,7 +799,7 @@ class AbstractSpinnakerBase(ConfigHandler, SimulatorInterface):
 
         # Work out the maximum run duration given all recordings
         if self._max_run_time_steps is None:
-            self._max_run_time_steps = self._deduce_data_n_timesteps(n_machine_time_steps)
+            self._max_run_time_steps = self._deduce_data_n_timesteps()
 
         # Work out an array of timesteps to perform
         steps = None
@@ -935,7 +935,7 @@ class AbstractSpinnakerBase(ConfigHandler, SimulatorInterface):
                         self._application_graph.add_edge(
                             dependant_edge, edge_identifier)
 
-    def _deduce_data_n_timesteps(self,n_machine_timesteps):
+    def _deduce_data_n_timesteps(self):
         """ Operates the auto pause and resume functionality by figuring out\
             how many timer ticks a simulation can run before SDRAM runs out,\
             and breaks simulation into chunks of that long.
@@ -962,7 +962,7 @@ class AbstractSpinnakerBase(ConfigHandler, SimulatorInterface):
                 max_this_chip = int((size - sdram.fixed) // sdram.per_timestep)
                 max_time_steps = min(max_time_steps, max_this_chip)
 
-        return min(max_time_steps,n_machine_timesteps)
+        return max_time_steps
 
     @staticmethod
     def _generate_steps(n_steps, n_steps_per_segment):
