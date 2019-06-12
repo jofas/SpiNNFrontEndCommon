@@ -4,7 +4,7 @@ from pacman.model.routing_info import DictBasedMachinePartitionNKeysMap
 from spinn_front_end_common.abstract_models import (
     AbstractProvidesNKeysForPartition)
 from spinn_front_end_common.utilities.exceptions import ConfigurationException
-
+from spinnak_ear.spinnakear_vertex import SpiNNakEarVertex
 
 class EdgeToNKeysMapper(object):
     """ Works out the number of keys needed for each edge.
@@ -66,6 +66,8 @@ class EdgeToNKeysMapper(object):
             partition.pre_vertex)
         vertex = graph_mapper.get_application_vertex(
             partition.pre_vertex)
+        if isinstance(vertex,SpiNNakEarVertex):
+            vertex = partition.pre_vertex
 
         if isinstance(vertex, AbstractProvidesNKeysForPartition):
             n_keys = vertex.get_n_keys_for_partition(partition, graph_mapper)
