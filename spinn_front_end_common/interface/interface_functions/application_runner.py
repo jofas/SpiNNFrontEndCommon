@@ -119,8 +119,8 @@ class ApplicationRunner(object):
                 "Application started; waiting {}s for it to stop",
                 time_to_wait)
             time.sleep(time_to_wait)
-            self._wait_for_end(txrx, app_id, executable_types,
-                               timeout=time_threshold)
+            # self._wait_for_end(txrx, app_id, executable_types,
+            #                    timeout=time_threshold)
         else:
             logger.info("Application started; waiting until finished")
             self._wait_for_end(txrx, app_id, executable_types)
