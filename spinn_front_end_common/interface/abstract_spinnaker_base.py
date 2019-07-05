@@ -46,7 +46,8 @@ from spinn_front_end_common.utilities.function_list import (
 from spinn_front_end_common.utilities.helpful_functions import (
     convert_time_diff_to_total_milliseconds,
     sort_out_downed_chips_cores_links)
-from spinn_front_end_common.utilities.report_functions import EnergyReport
+from spinn_front_end_common.utilities.report_functions import (
+    EnergyReport, TagsFromMachineReport)
 from spinn_front_end_common.utilities.utility_objs import (
     ExecutableType, ProvenanceDataItem)
 from spinn_front_end_common.utility_models import (
@@ -1036,6 +1037,8 @@ class AbstractSpinnakerBase(ConfigHandler, SimulatorInterface):
             self._txrx = executor.get_item("MemoryTransceiver")
             self._machine_allocation_controller = executor.get_item(
                 "MachineAllocationController")
+            report_folder = executor.get_item("ReportFolder")
+            TagsFromMachineReport()(report_folder, self._txrx)
             exc_info = sys.exc_info()
             try:
                 self._shutdown()
@@ -1481,8 +1484,7 @@ class AbstractSpinnakerBase(ConfigHandler, SimulatorInterface):
                 optional_algorithms.append("comparisonOfRoutingTablesReport")
             if self._config.getboolean(
                     "Reports", "write_routing_tables_from_machine_report"):
-                optional_algorithms.append(
-                    "RoutingTableFromMachineReport")
+                optional_algorithms.append("RoutingTableFromMachineReport")
 
             # only add board chip report if requested
             if self._config.getboolean("Reports", "write_board_chip_report"):
@@ -1703,6 +1705,8 @@ class AbstractSpinnakerBase(ConfigHandler, SimulatorInterface):
         # This report is one way to get them if done on machine
         if routing_tables_needed:
             optional_algorithms.append("RoutingTableFromMachineReport")
+        if self._config.getboolean("Reports", "write_tag_allocation_reports"):
+            algorithms.append("TagsFromMachineReport")
 
         # Decide what needs to be done
         required_tokens = ["DataLoaded", "BinariesLoaded"]
