@@ -672,11 +672,11 @@ class AbstractSpinnakerBase(ConfigHandler, SimulatorInterface):
         self._run(None, run_until_complete=True)
 
     def capture_image(self, name):
-        os.system("usbreset /dev/bus/usb/003/044")
+        # os.system("usbreset /dev/bus/usb/003/044")
         now = datetime.datetime.now().isoformat()
         image = "{}{}{}_{}.jpeg".format(
             self._report_default_directory, os.sep, now, name)
-        os.system("streamer -c /dev/video0 -s640x480 -o {}".format(image))
+        os.system("streamer -c /dev/video0 -s640x480 -o {} -w 2".format(image))
         os.system("convert -rotate 180 {} {}".format(image, image))
 
     def run(self, run_time):
