@@ -1,36 +1,22 @@
-# pacman imports
-from pacman.model.constraints.placer_constraints\
-    import PlacerRadialPlacementFromChipConstraint
-from pacman.model.decorators.overrides import overrides
+from spinn_utilities.overrides import overrides
+from spinnman.messages.eieio import EIEIOType, EIEIOPrefix
 from pacman.model.graphs.application import ApplicationVertex
-
-# spinn front end imports
-from pacman.model.resources import CPUCyclesPerTickResource, DTCMResource
-from pacman.model.resources import IPtagResource, ResourceContainer
-from pacman.model.resources import SDRAMResource
+from pacman.model.resources import (
+    ConstantSDRAM, CPUCyclesPerTickResource, DTCMResource, IPtagResource,
+    ResourceContainer)
 from spinn_front_end_common.utilities.exceptions import ConfigurationException
-from spinn_front_end_common.utility_models\
-    .live_packet_gather_machine_vertex \
-    import LivePacketGatherMachineVertex
-from spinn_front_end_common.abstract_models\
-    .abstract_generates_data_specification \
-    import AbstractGeneratesDataSpecification
-from spinn_front_end_common.abstract_models.abstract_has_associated_binary \
-    import AbstractHasAssociatedBinary
-from spinn_front_end_common.utilities.utility_objs.executable_start_type \
-    import ExecutableStartType
-
-# spinnman imports
-from spinnman.messages.eieio.eieio_type import EIEIOType
-from spinnman.messages.eieio.eieio_prefix import EIEIOPrefix
+from .live_packet_gather_machine_vertex import LivePacketGatherMachineVertex
+from spinn_front_end_common.abstract_models import (
+    AbstractGeneratesDataSpecification, AbstractHasAssociatedBinary)
+from spinn_front_end_common.utilities.utility_objs import ExecutableType
 
 
 class LivePacketGather(
-        AbstractGeneratesDataSpecification, AbstractHasAssociatedBinary,
-        ApplicationVertex):
+        ApplicationVertex, AbstractGeneratesDataSpecification,
+        AbstractHasAssociatedBinary):
     """ A model which stores all the events it receives during a timer tick\
         and then compresses them into Ethernet packets and sends them out of\
-        a spinnaker machine.
+        a SpiNNaker machine.
     """
 
     def __init__(
@@ -41,8 +27,7 @@ class LivePacketGather(
             payload_prefix=None, payload_right_shift=0,
             number_of_packets_sent_per_time_step=0, constraints=None,
             label=None):
-        """
-        """
+        # pylint: disable=too-many-arguments, too-many-locals
         if ((message_type == EIEIOType.KEY_PAYLOAD_32_BIT or
              message_type == EIEIOType.KEY_PAYLOAD_16_BIT) and
                 use_payload_prefix and payload_as_time_stamps):
@@ -66,10 +51,7 @@ class LivePacketGather(
         if label is None:
             label = "Live Packet Gatherer"
 
-        ApplicationVertex.__init__(self, label, constraints, 1)
-
-        # Try to place this near the Ethernet
-        self.add_constraint(PlacerRadialPlacementFromChipConstraint(0, 0))
+        super(LivePacketGather, self).__init__(label, constraints, 1)
 
         # storage objects
         self._iptags = None
@@ -96,7 +78,7 @@ class LivePacketGather(
 
     @overrides(ApplicationVertex.create_machine_vertex)
     def create_machine_vertex(
-            self, vertex_slice, resources_required,
+            self, vertex_slice, resources_required,  # @UnusedVariable
             label=None, constraints=None):
         return LivePacketGatherMachineVertex(
             label, self._use_prefix, self._key_prefix, self._prefix_type,
@@ -114,7 +96,7 @@ class LivePacketGather(
 
     @overrides(AbstractHasAssociatedBinary.get_binary_start_type)
     def get_binary_start_type(self):
-        return ExecutableStartType.USES_SIMULATION_INTERFACE
+        return ExecutableType.USES_SIMULATION_INTERFACE
 
     @property
     @overrides(ApplicationVertex.n_atoms)
@@ -122,9 +104,9 @@ class LivePacketGather(
         return 1
 
     @overrides(ApplicationVertex.get_resources_used_by_atoms)
-    def get_resources_used_by_atoms(self, vertex_slice):
+    def get_resources_used_by_atoms(self, vertex_slice):  # @UnusedVariable
         return ResourceContainer(
-            sdram=SDRAMResource(
+            sdram=ConstantSDRAM(
                 LivePacketGatherMachineVertex.get_sdram_usage()),
             dtcm=DTCMResource(LivePacketGatherMachineVertex.get_dtcm_usage()),
             cpu_cycles=CPUCyclesPerTickResource(
@@ -132,7 +114,8 @@ class LivePacketGather(
             iptags=[IPtagResource(
                 ip_address=self._ip_address, port=self._port,
                 strip_sdp=self._strip_sdp, tag=self._tag,
-                traffic_identifier="LPG_EVENT_STREAM")])
+                traffic_identifier=(
+                    LivePacketGatherMachineVertex.TRAFFIC_IDENTIFIER))])
 
     @overrides(AbstractGeneratesDataSpecification.generate_data_specification)
     def generate_data_specification(self, spec, placement):

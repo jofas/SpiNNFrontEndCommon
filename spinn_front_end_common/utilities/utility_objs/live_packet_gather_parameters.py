@@ -1,7 +1,6 @@
-
 class LivePacketGatherParameters(object):
-    """ parameter holder for LPG's so that they can be instantiated at a\
-     later date.
+    """ Parameter holder for LPGs so that they can be instantiated at a\
+        later date.
     """
 
     __slots__ = [
@@ -16,9 +15,9 @@ class LivePacketGatherParameters(object):
             self, port, hostname, tag, board_address, strip_sdp, use_prefix,
             key_prefix, prefix_type, message_type, right_shift,
             payload_as_time_stamps, use_payload_prefix, payload_prefix,
-            payload_right_shift, number_of_packets_sent_per_time_step, label,
+            payload_right_shift, number_of_packets_sent_per_time_step,
             partition_id):
-
+        # pylint: disable=too-many-arguments, too-many-locals
         self._port = port
         self._hostname = hostname
         self._tag = tag
@@ -35,16 +34,11 @@ class LivePacketGatherParameters(object):
         self._payload_right_shift = payload_right_shift
         self._number_of_packets_sent_per_time_step = \
             number_of_packets_sent_per_time_step
-        self._label = label
         self._partition_id = partition_id
 
     @property
     def port(self):
         return self._port
-
-    @property
-    def label(self):
-        return self._label
 
     @property
     def hostname(self):
@@ -107,7 +101,8 @@ class LivePacketGatherParameters(object):
         return self._partition_id
 
     def __eq__(self, other):
-        if (self._port == other.port and self._hostname == other.hostname and
+        return (self._port == other.port and
+                self._hostname == other.hostname and
                 self._tag == other.tag and
                 self._board_address == other.board_address and
                 self._strip_sdp == other.strip_sdp and
@@ -123,11 +118,17 @@ class LivePacketGatherParameters(object):
                 self._payload_right_shift == other.payload_right_shift and
                 self._number_of_packets_sent_per_time_step ==
                 other.number_of_packets_sent_per_time_step and
-                self._label == other.label and
-                self._partition_id == other.partition_id):
-            return True
-        else:
-            return False
+                self._partition_id == other.partition_id)
 
     def __ne__(self, other):
         return not self.__eq__(other)
+
+    def __hash__(self):
+        data = (
+            self._port, self._tag, self._board_address, self._strip_sdp,
+            self._use_prefix, self._key_prefix, self._prefix_type,
+            self._message_type, self._right_shift,
+            self._payload_as_time_stamps, self._use_payload_prefix,
+            self._payload_prefix, self._payload_right_shift,
+            self._number_of_packets_sent_per_time_step, self._partition_id)
+        return hash(data)

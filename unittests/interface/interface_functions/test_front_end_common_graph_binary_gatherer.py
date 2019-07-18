@@ -1,25 +1,17 @@
 import unittest
-
-from pacman.model.graphs.machine.machine_vertex import MachineVertex
-from pacman.model.resources.resource_container import ResourceContainer
-from pacman.model.placements.placements import Placements
-from pacman.model.placements.placement import Placement
-from pacman.model.graphs.machine.machine_graph import MachineGraph
-
-from spinn_front_end_common.interface.interface_functions\
-    .front_end_common_graph_binary_gatherer \
-    import FrontEndCommonGraphBinaryGatherer
-from spinn_front_end_common.utilities.exceptions import ConfigurationException
-from spinn_front_end_common.utilities.utility_objs.executable_start_type \
-    import ExecutableStartType
-from spinn_front_end_common.abstract_models.abstract_has_associated_binary \
-    import AbstractHasAssociatedBinary
+from pacman.model.graphs.machine import MachineVertex, MachineGraph
+from pacman.model.resources import ResourceContainer
+from pacman.model.placements import Placements, Placement
+from spinn_front_end_common.interface.interface_functions import (
+    GraphBinaryGatherer, LocateExecutableStartType)
+from spinn_front_end_common.utilities.utility_objs import ExecutableType
+from spinn_front_end_common.abstract_models import AbstractHasAssociatedBinary
 
 
 class _TestVertexWithBinary(MachineVertex, AbstractHasAssociatedBinary):
 
     def __init__(self, binary_file_name, binary_start_type):
-        MachineVertex.__init__(self)
+        super(_TestVertexWithBinary, self).__init__()
         self._binary_file_name = binary_file_name
         self._binary_start_type = binary_start_type
 
@@ -34,16 +26,11 @@ class _TestVertexWithBinary(MachineVertex, AbstractHasAssociatedBinary):
 
 
 class _TestVertexWithoutBinary(MachineVertex):
-
-    def __init__(self):
-        MachineVertex.__init__(self)
-
     def resources_required(self):
         return ResourceContainer()
 
 
 class _TestExecutableFinder(object):
-
     def get_executable_path(self, executable_name):
         return executable_name
 
@@ -55,11 +42,11 @@ class TestFrontEndCommonGraphBinaryGatherer(unittest.TestCase):
         """
 
         vertex_1 = _TestVertexWithBinary(
-            "test.aplx", ExecutableStartType.RUNNING)
+            "test.aplx", ExecutableType.RUNNING)
         vertex_2 = _TestVertexWithBinary(
-            "test2.aplx", ExecutableStartType.RUNNING)
+            "test2.aplx", ExecutableType.RUNNING)
         vertex_3 = _TestVertexWithBinary(
-            "test2.aplx", ExecutableStartType.RUNNING)
+            "test2.aplx", ExecutableType.RUNNING)
         vertex_4 = _TestVertexWithoutBinary()
 
         graph = MachineGraph("Test")
@@ -71,10 +58,12 @@ class TestFrontEndCommonGraphBinaryGatherer(unittest.TestCase):
             Placement(vertex_3, 0, 0, 2),
             Placement(vertex_4, 0, 0, 3)])
 
-        gatherer = FrontEndCommonGraphBinaryGatherer()
-        targets, start_type = gatherer.__call__(
+        gatherer = GraphBinaryGatherer()
+        targets = gatherer.__call__(
             placements, graph, _TestExecutableFinder())
-        self.assertEqual(start_type, ExecutableStartType.RUNNING)
+        gatherer = LocateExecutableStartType()
+        start_type = gatherer.__call__(graph, placements)
+        self.assertEqual(next(iter(start_type)), ExecutableType.RUNNING)
         self.assertEqual(targets.total_processors, 3)
 
         test_cores = targets.get_cores_for_binary("test.aplx")
@@ -90,20 +79,23 @@ class TestFrontEndCommonGraphBinaryGatherer(unittest.TestCase):
         """
 
         vertex_1 = _TestVertexWithBinary(
-            "test.aplx", ExecutableStartType.RUNNING)
+            "test.aplx", ExecutableType.RUNNING)
         vertex_2 = _TestVertexWithBinary(
-            "test2.aplx", ExecutableStartType.SYNC)
-
-        graph = MachineGraph("Test")
-        graph.add_vertices([vertex_1, vertex_2])
+            "test2.aplx", ExecutableType.SYNC)
 
         placements = Placements(placements=[
             Placement(vertex_1, 0, 0, 0),
             Placement(vertex_2, 0, 0, 1)])
 
-        gatherer = FrontEndCommonGraphBinaryGatherer()
-        with self.assertRaises(ConfigurationException):
-            gatherer.__call__(placements, graph, _TestExecutableFinder())
+        graph = MachineGraph("Test")
+        graph.add_vertices([vertex_1, vertex_2])
+
+        gatherer = LocateExecutableStartType()
+        results = gatherer.__call__(graph, placements=placements)
+        self.assertIn(ExecutableType.RUNNING, results)
+        self.assertIn(ExecutableType.SYNC, results)
+        self.assertNotIn(ExecutableType.USES_SIMULATION_INTERFACE, results)
+        self.assertNotIn(ExecutableType.NO_APPLICATION, results)
 
 
 if __name__ == '__main__':

@@ -1,8 +1,6 @@
 from six import add_metaclass
-
-from spinn_utilities.abstract_base import AbstractBase
-from spinn_utilities.abstract_base import abstractproperty
-from spinn_utilities.abstract_base import abstractmethod
+from spinn_utilities.abstract_base import (
+    AbstractBase, abstractproperty, abstractmethod)
 
 
 @add_metaclass(AbstractBase)
@@ -11,7 +9,7 @@ class SimulatorInterface(object):
     __slots__ = ()
 
     @abstractmethod
-    def add_socket_address(self, x):
+    def add_socket_address(self, socket_address):
         pass
 
     @abstractproperty
@@ -28,6 +26,10 @@ class SimulatorInterface(object):
 
     @abstractproperty
     def has_ran(self):
+        pass
+
+    @abstractmethod
+    def verify_not_running(self):
         pass
 
     @abstractproperty
@@ -52,6 +54,14 @@ class SimulatorInterface(object):
 
     @abstractproperty
     def placements(self):
+        pass
+
+    @abstractproperty
+    def tags(self):
+        pass
+
+    @abstractproperty
+    def time_scale_factor(self):
         pass
 
     @abstractproperty

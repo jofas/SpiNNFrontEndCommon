@@ -1,8 +1,8 @@
-import sqlite3 as sqlite
+import sqlite3
 
 
 class DatabaseReader(object):
-    """ A reader for the database
+    """ A reader for the database.
     """
 
     __slots__ = [
@@ -15,12 +15,11 @@ class DatabaseReader(object):
 
     def __init__(self, database_path):
         """
-
         :param database_path: The path to the database
         :type database_path: str
         """
-        self._connection = sqlite.connect(database_path)
-        self._connection.row_factory = sqlite.Row
+        self._connection = sqlite3.connect(database_path)
+        self._connection.row_factory = sqlite3.Row
         self._cursor = self._connection.cursor()
 
     @property
@@ -32,152 +31,156 @@ class DatabaseReader(object):
         return self._cursor
 
     def get_key_to_atom_id_mapping(self, label):
-        """ Get a mapping of event key to atom id for a given vertex
+        """ Get a mapping of event key to atom ID for a given vertex
 
         :param label: The label of the vertex
         :type label: str
-        :return: dictionary of atom ids indexed by event key
-        :rtype: dict
+        :return: dictionary of atom IDs indexed by event key
+        :rtype: dict(int, int)
         """
         event_id_to_atom_id_mapping = dict()
         for row in self._cursor.execute(
-            "SELECT n.atom_id as a_id, n.event_id as event"
-            " FROM event_to_atom_mapping as n"
-            " JOIN Application_vertices as p ON n.vertex_id = p.vertex_id"
-                " WHERE p.vertex_label=\"{}\"".format(label)):
+                "SELECT n.atom_id AS a_id, n.event_id AS event"
+                " FROM event_to_atom_mapping AS n"
+                " JOIN Application_vertices AS p ON n.vertex_id = p.vertex_id"
+                " WHERE p.vertex_label = ?", (label, )):
             event_id_to_atom_id_mapping[row["event"]] = row["a_id"]
         return event_id_to_atom_id_mapping
 
     def get_atom_id_to_key_mapping(self, label):
-        """ Get a mapping of atom id to event key for a given vertex
+        """ Get a mapping of atom ID to event key for a given vertex
 
         :param label: The label of the vertex
         :type label: str
-        :return: dictionary of event keys indexed by atom id
+        :return: dictionary of event keys indexed by atom ID
+        :rtype: dict(int, int)
         """
         atom_to_event_id_mapping = dict()
         for row in self._cursor.execute(
-            "SELECT n.atom_id as a_id, n.event_id as event"
-            " FROM event_to_atom_mapping as n"
-            " JOIN Application_vertices as p ON n.vertex_id = p.vertex_id"
-                " WHERE p.vertex_label=\"{}\"".format(label)):
+                "SELECT n.atom_id AS a_id, n.event_id AS event"
+                " FROM event_to_atom_mapping AS n"
+                " JOIN Application_vertices AS p"
+                "   ON n.vertex_id = p.vertex_id"
+                " WHERE p.vertex_label = ?", (label, )):
             atom_to_event_id_mapping[row["a_id"]] = row["event"]
         return atom_to_event_id_mapping
 
     def get_live_output_details(self, label, receiver_label):
-        """ Get the ip address, port and whether the SDP headers are to be\
+        """ Get the IP address, port and whether the SDP headers are to be\
             stripped from the output from a vertex
 
         :param label: The label of the vertex
         :type label: str
-        :return: tuple of (ip address, port, strip SDP)
-        :rtype: (str, int, bool)
+        :return: tuple of (IP address, port, strip SDP)
+        :rtype: tuple(str, int, bool)
         """
         self._cursor.execute(
-            "SELECT * FROM IP_tags as tag"
-            " JOIN graph_mapper_vertex as mapper"
-            " ON tag.vertex_id = mapper.machine_vertex_id"
-            " JOIN Application_vertices as post_vertices"
-            " ON mapper.application_vertex_id = post_vertices.vertex_id"
-            " JOIN Application_edges as edges"
-            " ON mapper.application_vertex_id == edges.post_vertex"
-            " JOIN Application_vertices as pre_vertices"
-            " ON edges.pre_vertex == pre_vertices.vertex_id"
-            " WHERE pre_vertices.vertex_label == \"{}\""
-            " AND post_vertices.vertex_label == \"{}\""
-            .format(label, receiver_label))
+            "SELECT * FROM IP_tags AS tag"
+            " JOIN graph_mapper_vertex AS mapper"
+            "   ON tag.vertex_id = mapper.machine_vertex_id"
+            " JOIN Application_vertices AS post_vertices"
+            "   ON mapper.application_vertex_id = post_vertices.vertex_id"
+            " JOIN Application_edges AS edges"
+            "   ON mapper.application_vertex_id = edges.post_vertex"
+            " JOIN Application_vertices AS pre_vertices"
+            "   ON edges.pre_vertex = pre_vertices.vertex_id"
+            " WHERE pre_vertices.vertex_label = ?"
+            "   AND post_vertices.vertex_label = ?"
+            " LIMIT 1", (label, receiver_label))
         row = self._cursor.fetchone()
         return (
             row["ip_address"], row["port"], row["strip_sdp"],
-            row["board_address"])
+            row["board_address"], row["tag"])
 
     def get_live_input_details(self, label):
-        """ Get the ip address and port where live input should be sent\
+        """ Get the IP address and port where live input should be sent\
             for a given vertex
 
         :param label: The label of the vertex
         :type label: str
-        :return: tuple of (ip address, port)
-        :rtype: (str, int)
+        :return: tuple of (IP address, port)
+        :rtype: tuple(str, int)
         """
         self._cursor.execute(
-            "SELECT tag.board_address, tag.port as port"
-            " FROM Reverse_IP_tags as tag"
-            " JOIN graph_mapper_vertex as mapper"
-            " ON tag.vertex_id = mapper.machine_vertex_id"
-            " JOIN Application_vertices as application"
-            " ON mapper.application_vertex_id = application.vertex_id"
-            " WHERE application.vertex_label=\"{}\"".format(label))
+            "SELECT tag.board_address, tag.port AS port"
+            " FROM Reverse_IP_tags AS tag"
+            " JOIN graph_mapper_vertex AS mapper"
+            "   ON tag.vertex_id = mapper.machine_vertex_id"
+            " JOIN Application_vertices AS application"
+            "   ON mapper.application_vertex_id = application.vertex_id"
+            " WHERE application.vertex_label = ?"
+            " LIMIT 1", (label, ))
         row = self._cursor.fetchone()
         return row["board_address"], row["port"]
 
     def get_machine_live_output_details(self, label, receiver_label):
-        """ Get the ip address, port and whether the SDP headers are to be\
+        """ Get the IP address, port and whether the SDP headers are to be\
             stripped from the output from a machine vertex
 
         :param label: The label of the vertex
         :type label: str
-        :return: tuple of (ip address, port, strip SDP)
-        :rtype: (str, int, bool)
+        :return: tuple of (IP address, port, strip SDP)
+        :rtype: tuple(str, int, bool)
         """
         self._cursor.execute(
-            "SELECT * FROM IP_tags as tag"
-            " JOIN Machine_vertices as post_vertices"
-            " ON tag.vertex_id == post_vertices.vertex_id"
-            " JOIN Machine_edges as edges"
-            " ON post_vertices.vertex_id == edges.post_vertex"
-            " JOIN Machine_vertices as pre_vertices"
-            " ON edges.pre_vertex == pre_vertices.vertex_id"
-            " WHERE pre_vertices.label == \"{}\""
-            " AND post_vertices.label == \"{}\""
-            .format(label, receiver_label))
+            "SELECT * FROM IP_tags AS tag"
+            " JOIN Machine_vertices AS post_vertices"
+            "   ON tag.vertex_id = post_vertices.vertex_id"
+            " JOIN Machine_edges AS edges"
+            "   ON post_vertices.vertex_id = edges.post_vertex"
+            " JOIN Machine_vertices AS pre_vertices"
+            "   ON edges.pre_vertex = pre_vertices.vertex_id"
+            " WHERE pre_vertices.label = ?"
+            "   AND post_vertices.label = ?"
+            " LIMIT 1", (label, receiver_label))
         row = self._cursor.fetchone()
         return (
             row["ip_address"], row["port"], row["strip_sdp"],
-            row["board_address"])
+            row["board_address"], row["tag"])
 
     def get_machine_live_input_details(self, label):
-        """ Get the ip address and port where live input should be sent\
+        """ Get the IP address and port where live input should be sent\
             for a given machine vertex
 
         :param label: The label of the vertex
         :type label: str
-        :return: tuple of (ip address, port)
-        :rtype: (str, int)
+        :return: tuple of (IP address, port)
+        :rtype: tuple(str, int)
         """
         self._cursor.execute(
-            "SELECT tag.board_address, tag.port as port"
-            " FROM Reverse_IP_tags as tag"
-            " JOIN Machine_vertices as post_vertices"
-            " ON tag.vertex_id = post_vertices.vertex_id"
-            " WHERE post_vertices.label=\"{}\"".format(label))
+            "SELECT tag.board_address, tag.port AS port"
+            " FROM Reverse_IP_tags AS tag"
+            " JOIN Machine_vertices AS post_vertices"
+            "   ON tag.vertex_id = post_vertices.vertex_id"
+            " WHERE post_vertices.label = ?"
+            " LIMIT 1", (label, ))
         row = self._cursor.fetchone()
         return row["board_address"], row["port"]
 
     def get_machine_live_output_key(self, label, receiver_label):
         self._cursor.execute(
-            "SELECT * FROM Routing_info as r_info"
-            " JOIN Machine_edges as edges"
-            " ON edges.edge_id == r_info.edge_id"
-            " JOIN Machine_vertices as post_vertices"
-            " ON post_vertices.vertex_id == edges.post_vertex"
-            " JOIN Machine_vertices as pre_vertices"
-            " ON pre_vertices.vertex_id == edges.pre_vertex"
-            " WHERE pre_vertices.label == \"{}\""
-            " AND post_vertices.label == \"{}\""
-            .format(label, receiver_label))
+            "SELECT * FROM Routing_info AS r_info"
+            " JOIN Machine_edges AS edges"
+            "   ON edges.edge_id = r_info.edge_id"
+            " JOIN Machine_vertices AS post_vertices"
+            "   ON post_vertices.vertex_id = edges.post_vertex"
+            " JOIN Machine_vertices AS pre_vertices"
+            "   ON pre_vertices.vertex_id = edges.pre_vertex"
+            " WHERE pre_vertices.label = ?"
+            "   AND post_vertices.label = ?"
+            " LIMIT 1", (label, receiver_label))
         row = self._cursor.fetchone()
         return (row["key"], row["mask"])
 
     def get_machine_live_input_key(self, label):
         self._cursor.execute(
-            "SELECT * FROM Routing_info as r_info"
-            " JOIN Machine_edges as edges"
-            " ON edges.edge_id == r_info.edge_id"
-            " JOIN Machine_vertices as pre_vertices"
-            " ON pre_vertices.vertex_id == edges.pre_vertex"
-            " WHERE pre_vertices.label == \"{}\""
-            .format(label))
+            "SELECT * FROM Routing_info AS r_info"
+            " JOIN Machine_edges AS edges"
+            "   ON edges.edge_id = r_info.edge_id"
+            " JOIN Machine_vertices AS pre_vertices"
+            "   ON pre_vertices.vertex_id = edges.pre_vertex"
+            " WHERE pre_vertices.label = ?"
+            " LIMIT 1", (label, ))
         row = self._cursor.fetchone()
         return (row["key"], row["mask"])
 
@@ -191,7 +194,8 @@ class DatabaseReader(object):
         """
         self._cursor.execute(
             "SELECT no_atoms FROM Application_vertices "
-            "WHERE vertex_label = \"{}\"".format(label))
+            "WHERE vertex_label = ?"
+            " LIMIT 1", (label, ))
         return self._cursor.fetchone()["no_atoms"]
 
     def get_configuration_parameter_value(self, parameter_name):
@@ -204,8 +208,72 @@ class DatabaseReader(object):
         """
         self._cursor.execute(
             "SELECT value FROM configuration_parameters"
-            " WHERE parameter_id = \"{}\"".format(parameter_name))
+            " WHERE parameter_id = ?"
+            " LIMIT 1", (parameter_name, ))
         return float(self._cursor.fetchone()["value"])
+
+    def get_placement(self, label):
+        """ Get the placement of a machine vertex with a given label
+
+        :param label: The label of the vertex
+        :type label: str
+        :return: The x, y, p coordinates of the vertex
+        :rtype: tuple(int, int, int)
+        """
+        self._cursor.execute(
+            "SELECT chip_x, chip_y, chip_p FROM Placements AS placement"
+            " JOIN Machine_Vertices AS vertex"
+            " ON vertex.vertex_id = placement.vertex_id"
+            " WHERE vertex.label = ? LIMIT 1", (label, ))
+        row = self._cursor.fetchone()
+        return (int(row["chip_x"]), int(row["chip_y"]), int(row["chip_p"]))
+
+    def get_placements(self, label):
+        """ Get the placements of an application vertex with a given label
+
+        :param label: The label of the vertex
+        :type label:str
+        :return: A list of x, y, p coordinates of the vertices
+        :rtype: list(tuple(int, int, int))
+        """
+        self._cursor.execute(
+            "SELECT chip_x, chip_y, chip_p FROM Placements AS placement"
+            " JOIN graph_mapper_vertex AS mapper"
+            "   ON placement.vertex_id = mapper.machine_vertex_id"
+            " JOIN Application_vertices AS vertex"
+            "   ON mapper.application_vertex_id = vertex.vertex_id"
+            " WHERE vertex.vertex_label = ?", (label, ))
+        rows = self._cursor.fetchall()
+        return [(int(row["chip_x"]), int(row["chip_y"]), int(row["chip_p"]))
+                for row in rows]
+
+    def get_ip_address(self, x, y):
+        """ Get an IP address to contact a chip
+
+        :param x: The x-coordinate of the chip
+        :param y: The y-coordinate of the chip
+        :return: The IP address of the Ethernet to use to contact the chip
+        """
+        self._cursor.execute(
+            "SELECT eth_chip.ip_address FROM Machine_chip as chip"
+            " JOIN Machine_chip as eth_chip"
+            "   ON chip.nearest_ethernet_x = eth_chip.chip_x AND "
+            "     chip.nearest_ethernet_y = eth_chip.chip_y"
+            " WHERE chip.chip_x = ? AND chip.chip_y = ?", (x, y))
+        row = self._cursor.fetchone()
+        if row is None:
+            self._cursor.execute(
+                "SELECT ip_address FROM Machine_chip"
+                " WHERE chip_x=0 AND chip_y=0")
+            row = self._cursor.fetchone()
+        return row["ip_address"]
 
     def close(self):
         self._connection.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):  # @UnusedVariable
+        self._connection.close()
+        return False

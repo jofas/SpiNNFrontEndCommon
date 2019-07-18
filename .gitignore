@@ -1,5 +1,6 @@
 .project
 .pydevproject
+.pytest_cache/
 .idea
 *.pyc
 *build/
@@ -8,3 +9,10 @@
 .settings
 .cproject
 Debug
+lastfailed
+/.cache
+.coverage
+*.o
+*.class
+*modified_src/
+*.dict

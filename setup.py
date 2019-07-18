@@ -1,5 +1,8 @@
 from setuptools import setup
-from collections import defaultdict
+try:
+    from collections.abc import defaultdict
+except ImportError:
+    from collections import defaultdict
 import os
 
 __version__ = None
@@ -8,7 +11,8 @@ assert __version__
 
 # Build a list of all project modules, as well as supplementary files
 main_package = "spinn_front_end_common"
-data_extensions = {".aplx", ".xml"}
+extensions = {".aplx", ".boot", ".cfg", ".json", ".sql", ".template", ".xml",
+              ".xsd", ".dict"}
 main_package_dir = os.path.join(os.path.dirname(__file__), main_package)
 start = len(main_package_dir)
 packages = []
@@ -20,26 +24,30 @@ for dirname, dirnames, filenames in os.walk(main_package_dir):
         packages.append(package)
     for filename in filenames:
         _, ext = os.path.splitext(filename)
-        if ext in data_extensions:
+        if ext in extensions:
             package = "{}{}".format(
                 main_package, dirname[start:].replace(os.sep, '.'))
-            package_data[package].append("*{}".format(ext))
-            break
+            package_data[package].append(filename)
 
 setup(
     name="SpiNNFrontEndCommon",
     version=__version__,
-    description="Common Spinnaker Front end functions",
+    description="Common SpiNNaker Front end functions",
     url="https://github.com/SpiNNakerManchester/SpiNNFrontEndCommon",
     packages=packages,
     package_data=package_data,
-    install_requires=['SpiNNUtilities >= 1!4.0.0a5, < 1!5.0.0',
-                      'SpiNNStorageHandlers >= 1!4.0.0a5, < 1!5.0.0',
-                      'SpiNNMachine >= 1!4.0.0a5, < 1!5.0.0',
-                      'SpiNNMan >= 1!4.0.0a5, < 1!5.0.0',
-                      'SpiNNaker_PACMAN >= 1!4.0.0a5, < 1!5.0.0',
-                      'SpiNNaker_DataSpecification >= 1!4.0.0a5, < 1!5.0.0',
-                      'spalloc >= 0.2.2, < 1.0.0',
+    install_requires=['SpiNNUtilities >= 1!4.0.1, < 1!5.0.0',
+                      'SpiNNStorageHandlers >= 1!4.0.1, < 1!5.0.0',
+                      'SpiNNMachine >= 1!4.0.1, < 1!5.0.0',
+                      'SpiNNMan >= 1!4.0.1, < 1!5.0.0',
+                      'SpiNNaker_PACMAN >= 1!4.0.1, < 1!5.0.0',
+                      'SpiNNaker_DataSpecification >= 1!4.0.1, < 1!5.0.0',
+                      'spalloc >= 1.0.1, < 2.0.0',
                       'requests >= 2.4.1',
-                      'numpy', 'six']
+                      'scipy >= 0.16.0',
+                      'numpy',
+                      'futures; python_version == "2.7"',
+                      'six'],
+    maintainer="SpiNNakerTeam",
+    maintainer_email="spinnakerusers@googlegroups.com"
 )

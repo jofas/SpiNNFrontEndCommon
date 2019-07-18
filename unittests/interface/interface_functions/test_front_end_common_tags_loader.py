@@ -1,14 +1,9 @@
 import unittest
-
-from pacman.model.tags.tags import Tags
-from pacman.model.graphs.machine.machine_vertex import MachineVertex
-from pacman.model.resources.resource_container import ResourceContainer
-
-from spinn_machine.tags.iptag import IPTag
-from spinn_machine.tags.reverse_iptag import ReverseIPTag
-
-from spinn_front_end_common.interface.interface_functions\
-    .front_end_common_tags_loader import FrontEndCommonTagsLoader
+from spinn_machine.tags import IPTag, ReverseIPTag
+from pacman.model.tags import Tags
+from pacman.model.graphs.machine import MachineVertex
+from pacman.model.resources import ResourceContainer
+from spinn_front_end_common.interface.interface_functions import TagsLoader
 
 
 class _MockTransceiver(object):
@@ -36,10 +31,6 @@ class _MockTransceiver(object):
 
 
 class _TestVertex(MachineVertex):
-
-    def __init__(self):
-        MachineVertex.__init__(self, None)
-
     def resources_required(self):
         return ResourceContainer(0)
 
@@ -65,7 +56,7 @@ class TestFrontEndCommonTagsLoader(unittest.TestCase):
 
         txrx = _MockTransceiver()
 
-        loader = FrontEndCommonTagsLoader()
+        loader = TagsLoader()
         loader.__call__(txrx, tags)
         self.assertIn(tag_1, txrx.ip_tags)
         self.assertIn(tag_2, txrx.ip_tags)
