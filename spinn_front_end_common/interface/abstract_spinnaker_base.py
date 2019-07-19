@@ -677,7 +677,7 @@ class AbstractSpinnakerBase(ConfigHandler, SimulatorInterface):
         image = "{}{}{}_{}.jpeg".format(
             self._report_default_directory, os.sep, now, name)
         os.system("streamer -c /dev/video0 -s640x480 -o {} -w 2".format(image))
-        os.system("convert -rotate 180 {} {}".format(image, image))
+        # os.system("convert -rotate 180 {} {}".format(image, image))
 
     def run(self, run_time):
         """ Run a simulation for a fixed amount of time
