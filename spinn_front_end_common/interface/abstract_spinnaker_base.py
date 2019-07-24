@@ -1,3 +1,18 @@
+# Copyright (c) 2017-2019 The University of Manchester
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 """
 main interface for the SpiNNaker tools
 """
@@ -1490,7 +1505,7 @@ class AbstractSpinnakerBase(ConfigHandler, SimulatorInterface):
                     "Reports", "write_router_summary_report"):
                 algorithms.append("RouterSummaryReport")
             if self._config.getboolean(
-                    "Reports", "write_compressed_router_summary_report") and \
+                   "Reports", "write_compressed_router_summary_report") and \
                     self.use_virtual_board:
                 algorithms.append("CompressedRouterSummaryReport")
             if self._config.getboolean("Reports",
@@ -1838,7 +1853,7 @@ class AbstractSpinnakerBase(ConfigHandler, SimulatorInterface):
 
         if self._config.getboolean(
                 "Reports", "write_sdram_usage_report_per_chip"):
-            algorithms.append("SdramUsageReportPperChip")
+            algorithms.append("SdramUsageReportPerChip")
 
         # clear iobuf if were in multirun mode
         if (self._has_ran and not graph_changed and

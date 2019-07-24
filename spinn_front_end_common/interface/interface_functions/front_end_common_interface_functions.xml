@@ -1,3 +1,19 @@
+<!--
+# Copyright (c) 2017-2019 The University of Manchester
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ -->
 <algorithms xmlns="https://github.com/SpiNNakerManchester/PACMAN"
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:schemaLocation="https://github.com/SpiNNakerManchester/PACMAN
@@ -1654,16 +1670,11 @@
                 <param_name>graph_mapper</param_name>
                 <param_type>MemoryGraphMapper</param_type>
             </parameter>
-            <parameter>
-                <param_name>application_graph</param_name>
-                <param_type>MemoryApplicationGraph</param_type>
-            </parameter>
         </input_definitions>
         <optional_inputs>
             <one_of>
                 <all_of>
                     <param_name>graph_mapper</param_name>
-                    <param_name>application_graph</param_name>
                     <param_name>machine_graph</param_name>
                 </all_of>
                 <all_of>
