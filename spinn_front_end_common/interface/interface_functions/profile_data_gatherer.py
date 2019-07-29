@@ -34,20 +34,19 @@ class ProfileDataGatherer(object):
 
         # retrieve provenance data from any cores that provide data
         for placement in progress.over(placements.placements):
-            if isinstance(placement.vertex, AbstractHasProfileData) and not isinstance(placement.vertex,OMEVertex)\
-                    and not isinstance(placement.vertex,DRNLVertex) and not isinstance(placement.vertex,IHCANVertex) \
-                    and not isinstance(placement.vertex,ANGroupVertex):
+            if isinstance(placement.vertex, AbstractHasProfileData):
                 # get data
                 profile_data = placement.vertex.get_profile_data(
                     transceiver, placement)
-                if profile_data.tags:
+                if profile_data.tags and not isinstance(placement.vertex,OMEVertex)\
+                    and not isinstance(placement.vertex,IHCANVertex) \
+                    and not isinstance(placement.vertex,DRNLVertex):
                     self._write(placement, profile_data, run_time_ms,
                                 machine_time_step_ms, provenance_file_path)
     def _write(self, p, profile_data, run_time_ms,
                machine_time_step_ms, directory):
         # pylint: disable=too-many-arguments
         max_tag_len = max([len(tag) for tag in profile_data.tags])
-
         spike_profile = profile_data.get_complete_profile('INCOMING_SPIKE')
         nonzero_rows_profile = profile_data.get_complete_profile('PROCESS_FIXED_SYNAPSES')
         timer_profile = profile_data.get_complete_profile('TIMER')
