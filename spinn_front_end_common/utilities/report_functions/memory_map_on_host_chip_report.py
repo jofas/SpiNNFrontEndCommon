@@ -39,7 +39,6 @@ class MemoryMapOnHostChipReport(object):
         :param transceiver: the spinnMan instance
         :rtype: None
         """
-
         directory_name = os.path.join(
             report_default_directory, MEM_MAP_SUBDIR_NAME)
         if not os.path.exists(directory_name):
@@ -59,9 +58,7 @@ class MemoryMapOnHostChipReport(object):
     def _describe_mem_map(self, f, txrx, x, y, p):
         # pylint: disable=too-many-arguments
         # Read the memory map data from the given core
-        user_0_addr = txrx.get_user_0_register_address_from_core(p)
-        pointer_table_addr = self._get_app_pointer_table(
-            txrx, x, y, user_0_addr)
+        pointer_table_addr = txrx.read_user_0(x, y, p) + 8
         memmap_data = txrx.read_memory(
             x, y, pointer_table_addr, 4 * MAX_MEM_REGIONS)
 
@@ -71,7 +68,3 @@ class MemoryMapOnHostChipReport(object):
             region_address, = _ONE_WORD.unpack_from(memmap_data, i * 4)
             f.write("Region {0:d}:\n\t start address: 0x{1:x}\n\n".format(
                 i, region_address))
-
-    def _get_app_pointer_table(self, txrx, x, y, table_pointer):
-        encoded_address = txrx.read_memory(x, y, table_pointer, 4)
-        return _ONE_WORD.unpack_from(encoded_address)[0] + 8
