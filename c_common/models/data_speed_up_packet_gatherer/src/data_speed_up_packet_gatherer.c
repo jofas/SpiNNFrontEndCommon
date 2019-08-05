@@ -59,6 +59,8 @@ enum sdp_port_commands {
 #define COMMAND_ID 0
 
 enum {
+    //! The SDP header itself is two words
+    SDP_HEADER_WORDS = 2,
     //! How many multicast packets are to be received per SDP packet
     ITEMS_PER_DATA_PACKET = 68,
     //! offset with just command and seq in bytes
@@ -78,10 +80,10 @@ enum {
             ITEMS_PER_DATA_PACKET - SEND_SEQ_DATA_HEADER_WORDS,
     //! size of payload for a packet describing the first batch of missing
     //! inbound seqs
-    ITEMS_PER_FIRST_MISSING_PACKET = ITEMS_PER_DATA_PACKET - 2,
+    ITEMS_PER_FIRST_MISSING_PACKET = ITEMS_PER_DATA_PACKET - 2 - SDP_HEADER_WORDS,
     //! size of payload for a packet describing the further batches of missing
     //! inbound seqs
-    ITEMS_PER_MORE_MISSING_PACKET = ITEMS_PER_DATA_PACKET - 1
+    ITEMS_PER_MORE_MISSING_PACKET = ITEMS_PER_DATA_PACKET - 1 - SDP_HEADER_WORDS
 };
 
 //-----------------------------------------------------------------------------
@@ -350,7 +352,7 @@ static inline void cancel_timeout(void) {
 
 static inline void set_message_length(const void *end) {
     my_msg.length = ((const uint8_t *) end) - &my_msg.flags;
-    if (my_msg.length > 272) {
+    if (my_msg.length > ITEMS_PER_DATA_PACKET * sizeof(uint)) {
         log_error("bad message length %u", my_msg.length);
     }
 }

@@ -831,19 +831,8 @@ static void reinjection_configure_router(void) {
 // data in speed up main functions
 //-----------------------------------------------------------------------------
 
-static void data_in_clear_router(void) {
-    rtr_entry_t router_entry;
-
-    // clear the currently loaded routing table entries
-    for (uint entry_id = N_BASIC_SYSTEM_ROUTER_ENTRIES;
-            entry_id < N_ROUTER_ENTRIES; entry_id++) {
-        //io_printf(IO_BUF, "clearing entry %d \n", entry_id);
-        if (rtr_mc_get(entry_id, &router_entry) &&
-                router_entry.key != INVALID_ROUTER_ENTRY_KEY &&
-                router_entry.mask != INVALID_ROUTER_ENTRY_MASK) {
-            rtr_free(entry_id, 1);
-        }
-    }
+static inline void data_in_clear_router(void) {
+    rtr_mc_init(N_BASIC_SYSTEM_ROUTER_ENTRIES);
 }
 
 static inline void data_in_process_boundary(void) {
