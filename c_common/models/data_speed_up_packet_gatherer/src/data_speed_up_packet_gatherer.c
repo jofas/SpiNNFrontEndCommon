@@ -41,6 +41,10 @@
 
 // sdp port commands received
 enum sdp_port_commands {
+    // router control relay
+    CMD_DPRI_SET_ROUTER_TIMEOUT = 0,
+    CMD_DPRI_SET_ROUTER_EMERGENCY_TIMEOUT = 1,
+    CMD_DPRI_SET_PACKET_TYPES = 2,
     // received
     SDP_SEND_DATA_TO_LOCATION_CMD = 200,
     SDP_SEND_SEQ_DATA_CMD = 2000,
@@ -159,14 +163,15 @@ static uint32_t max_seq_num = 0;
 static uint32_t data[ITEMS_PER_DATA_PACKET];
 static uint32_t position_in_store = 0;
 
-//! SDP message holder for transmissions
-static sdp_msg_pure_data my_msg;
+//! SDP message holders for transmissions
+static sdp_msg_pure_data my_msg, retransmit_msg;
 
 //! human readable definitions of each region in SDRAM
 enum {
     SYSTEM_REGION,
     CONFIG,
-    CHIP_TO_KEY
+    CHIP_TO_KEY,
+    EXTRA_MONITOR_COORDS
 };
 
 //! human readable definitions of the data in each region
@@ -220,9 +225,37 @@ typedef struct data_in_config_t {
     } chip_to_key[];
 } data_in_config_t;
 
+typedef struct extra_monitors_t {
+    uint32_t n_monitors;
+    struct monitor_address {
+        uint16_t addr;  // SDP destination address
+        uint8_t port;   // SDP destination port/CPU
+    } monitor[];
+} extra_monitors_t;
+
 //-----------------------------------------------------------------------------
 // FUNCTIONS
 //-----------------------------------------------------------------------------
+
+void reinjection_repeater(sdp_msg_pure_data *msg) {
+    data_specification_metadata_t *ds_regions =
+            data_specification_get_data_address();
+    extra_monitors_t *xm = data_specification_get_region(
+            EXTRA_MONITOR_COORDS, ds_regions);
+
+    spin1_memcpy(&retransmit_msg.flags, *msg->flags, msg->length);
+    retransmit_msg.srce_port = 3;
+    retransmit_msg.srce_addr = sv->p2p_addr;
+    for (uint32_t i = xm->n_monitors ; xm-->0 ;) {
+        retransmit_msg.dest_addr = xm->monitor[i].addr;
+        retransmit_msg.dest_port = xm->monitor[i].port;
+        while (!spin1_send_sdp_msg((sdp_msg_t *) &retransmit_msg, SDP_TIMEOUT)) {
+            log_error("failed to retransmit SDP message to %04x",
+                    xm->monitor[i].addr);
+            spin1_delay_us(MESSAGE_DELAY_TIME_WHEN_FAIL);
+        }
+    }
+}
 
 //! \brief sends the SDP message built in the my_msg global
 static inline void send_sdp_message(void) {
@@ -535,7 +568,7 @@ static void check_for_timeout(uint unused0, uint unused1) {
 //! \brief processes sdp messages
 //! \param[in] mailbox: the sdp message
 //! \param[in] port: the port associated with this sdp message
-static void data_in_receive_sdp_data(uint mailbox, uint port) {
+static void receive_sdp_msg(uint mailbox, uint port) {
     // use as not important
     use(port);
 
@@ -545,6 +578,11 @@ static void data_in_receive_sdp_data(uint mailbox, uint port) {
 
     // check for separate commands
     switch (command) {
+    case CMD_DPRI_SET_ROUTER_TIMEOUT:
+    case CMD_DPRI_SET_ROUTER_EMERGENCY_TIMEOUT:
+    case CMD_DPRI_SET_PACKET_TYPES:
+        reinjection_repeater(msg);
+        break;
     case SDP_SEND_DATA_TO_LOCATION_CMD:
         // Stop timeouts while doing synchronous message processing
         cancel_timeout();
@@ -685,7 +723,7 @@ static void initialise(void) {
         data_in_mc_key_map[x_coord][y_coord] = base_key;
     }
 
-    spin1_callback_on(SDP_PACKET_RX, data_in_receive_sdp_data, SDP);
+    spin1_callback_on(SDP_PACKET_RX, receive_sdp_msg, SDP);
 
     // Set up the timeout system
     time = 0;
