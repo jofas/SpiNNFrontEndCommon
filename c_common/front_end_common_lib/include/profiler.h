@@ -46,8 +46,10 @@ static inline void profiler_write_entry(uint32_t tag) {
             //todo: need to store indices of the spike processing profile entries that prempt each timer profile.
             *profiler_output++ = timer_pro_count_start;
             *profiler_output++ = (PROFILER_ENTER|PROFILER_PROCESS_FIXED_SYNAPSES);
+             profiler_samples_remaining--;
             *profiler_output++ = spike_pro_count;
             *profiler_output++ = (PROFILER_EXIT|PROFILER_PROCESS_FIXED_SYNAPSES);
+             profiler_samples_remaining--;
         }
 
         if( tag == (PROFILER_ENTER | PROFILER_TIMER)){
@@ -62,7 +64,7 @@ static inline void profiler_write_entry(uint32_t tag) {
         profiler_samples_remaining--;
     }
     else{
-        io_printf(IO_BUF,"run out of profile samples!");
+        //io_printf(IO_BUF,"run out of profile samples!");
     }
 }
 
