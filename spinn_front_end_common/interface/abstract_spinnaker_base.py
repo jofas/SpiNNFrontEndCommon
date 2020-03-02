@@ -1611,6 +1611,10 @@ class AbstractSpinnakerBase(ConfigHandler, SimulatorInterface):
                 algorithms.append("WriteJsonMachine")
 
             if self._config.getboolean(
+                    "Reports", "write_json_graph"):
+                algorithms.append("WriteJsonGraph")
+
+            if self._config.getboolean(
                     "Reports", "write_json_machine_graph"):
                 algorithms.append("WriteJsonMachineGraph")
 

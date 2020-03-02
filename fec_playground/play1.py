@@ -1,10 +1,10 @@
 import tempfile
 from pacman.executor import PACMANAlgorithmExecutor
-from pacman.utilities.json_utils import machine_graph_from_json, n_keys_map_from_json
+from pacman.utilities.json_utils import graphs_from_json, n_keys_map_from_json
 from spinn_front_end_common.utilities.function_list import (
     get_front_end_common_pacman_xml_paths)
 
-machine_graph = machine_graph_from_json("machine_graph.json")
+application_graph, machine_graph, graph_mapper = graphs_from_json("graph.json")
 n_keys_map = n_keys_map_from_json("n_keys_map.json", machine_graph)
 
 temp = tempfile.mkdtemp()
