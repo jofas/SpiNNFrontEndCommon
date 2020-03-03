@@ -39,7 +39,7 @@ def clear_output(output_dir):
 
 
 def read_graphs_from_json(json_dir=None):
-    graph_json = "graph.json"
+    graph_json = "graphs.json"
     key_json = "n_keys_map.json"
     if json_dir:
         graph_json = os.path.join(json_dir, graph_json)
@@ -51,7 +51,7 @@ def read_graphs_from_json(json_dir=None):
 
 
 logging.basicConfig(level=logging.INFO)
-machine_inputs, machine_algorithms = get_machine_inputs(None)
+machine_inputs, machine_algorithms = get_machine_inputs(1)
 
 #temp = tempfile.mkdtemp()
 output_dir = "output"
