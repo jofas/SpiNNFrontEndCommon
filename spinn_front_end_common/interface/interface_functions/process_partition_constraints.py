@@ -34,7 +34,9 @@ class ProcessPartitionConstraints(object):
                 "Can only do one graph. semantically doing 2 graphs makes no "
                 "sense. Please choose and try again")
 
-        if application_graph is not None:
+        # application_graph.n_outgoing_edge_partitions == 0 comes from json
+        if application_graph is not None \
+                and application_graph.n_outgoing_edge_partitions < 0:
             # generate progress bar
             progress = ProgressBar(
                 machine_graph.n_vertices,
