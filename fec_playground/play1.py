@@ -98,6 +98,22 @@ def mapper_stats(application_graph, graph_mapper):
     for vertex in application_graph.vertices:
         print(vertex, len(graph_mapper.get_machine_vertices(vertex)))
 
+def keys_report(application_graph, graph_mapper, machine_graph, n_keys_map):
+    for app_vertex in application_graph.vertices:
+        print(app_vertex.label)
+        counts = {}
+        for mac_vertex in graph_mapper.get_machine_vertices(app_vertex):
+            edge_count = 0
+            key_count = 0
+            for edge in machine_graph.get_edges_ending_at_vertex(mac_vertex):
+                edge_count+= 1
+                partition = machine_graph.get_outgoing_partition_for_edge(edge)
+                key_count += n_keys_map.n_keys_for_partition(partition)
+            counts[(edge_count, key_count)] = \
+                counts.get((edge_count, key_count), 0) + 1
+        for ((edge_count, key_count), num) in counts.items():
+            print("{} vertexes have {} incoming edges with a total of {}  keys ".format(num, edge_count, key_count))
+
 
 logging.basicConfig(level=logging.INFO)
 
@@ -105,25 +121,28 @@ logging.basicConfig(level=logging.INFO)
 output_dir = "output"
 clear_output(output_dir)
 json_dir = "D:\spinnaker\my_spinnaker\peter"
+#json_dir = "D:/spinnaker/my_spinnaker/reports/2020-03-10-08-15-19-853644/run_1/json_files"
 
 # machine_inputs, machine_algorithms = get_machine_inputs(100)
 machine_inputs, machine_algorithms = get_json_machine_inputs(json_dir)
 
-# graphs_path = get_path("graphs.json", json_dir)
-graphs_path = "graphs_min.json"
+graphs_path = get_path("graphs.json", json_dir)
+#graphs_path = "graphs_min.json"
 print("reading ", graphs_path)
 application_graph, machine_graph, graph_mapper = graphs_from_json(
     graphs_path)
 
-print("app_vertexes:", application_graph.n_vertices)
-graph_stats(machine_graph)
-mapper_stats(application_graph, graph_mapper)
+#print("app_vertexes:", application_graph.n_vertices)
+#graph_stats(machine_graph)
+#mapper_stats(application_graph, graph_mapper)
 
 n_keys_map = n_keys_map_from_json(
-#    get_path("n_keys_map.json", json_dir), machine_graph)
-    "n_keys_map_min.json", machine_graph)
+    get_path("n_keys_map.json", json_dir), machine_graph)
+#    "n_keys_map_min.json", machine_graph)
 
+keys_report(application_graph, graph_mapper, machine_graph, n_keys_map)
 
+"""
 inputs = {
     "MemoryMachineGraph": machine_graph,
     "MemoryApplicationGraph": application_graph,
@@ -165,3 +184,4 @@ executor = PACMANAlgorithmExecutor(
     algorithms, [], inputs, [], [], [],
     xml_paths=get_front_end_common_pacman_xml_paths())
 executor.execute_mapping()
+"""
