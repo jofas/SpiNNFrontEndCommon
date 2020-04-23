@@ -237,7 +237,6 @@ bool set_up_search_bitfields(void) {
 
 //! \brief counts how many cores are actually doing something.
 //! \return the number of compressor cores doing something at the moment.
-
 int count_many_on_going_compression_attempts_are_running(void) {
     int count = 0;
     for (int c_core_index = 0; c_core_index < n_compression_cores;
@@ -326,6 +325,7 @@ bool start_binary_search(void){
         hops_between_compression_cores = 1;
     }
 
+    malloc_extras_check_all();
     log_info("n_bf_addresses is %d", n_bf_addresses);
     log_debug(
         "n available compression cores is %d", n_available_compression_cores);
@@ -343,8 +343,6 @@ bool start_binary_search(void){
             index, sorted_bit_fields->processor_ids[index]);
     }
 
-
-
     // iterate till either ran out of cores, or failed to malloc sdram during
     // the setup of a core or when gone too far
     while ((n_available_compression_cores != 0) && !failed_to_malloc &&
@@ -352,6 +350,7 @@ bool start_binary_search(void){
         log_debug("next mid point to consider = %d", new_mid_point);
 
         bool success = create_tables_and_set_off_bit_compressor(new_mid_point);
+        malloc_extras_check_all();
         if (success) {
             multiplier++;
         }
@@ -414,7 +413,6 @@ static inline filter_region_t* find_processor_bit_field_region(
 //! \param[in] sorted_bf_key_proc: the key store
 //! \param[in] key: the key to locate a entry for
 //! \return true if found, false otherwise
-
 bool has_entry_in_sorted_keys(
         proc_bit_field_keys_t sorted_bf_key_proc, uint32_t key) {
     for (int element_index = 0;
@@ -434,7 +432,6 @@ bool has_entry_in_sorted_keys(
 //! \brief removes the merged bitfields from the application cores bitfield
 //!        regions
 //! \return bool if was successful or not
-
 bool remove_merged_bitfields_from_cores(void) {
     // only try if there are bitfields to remove
     if (n_bf_addresses == 0){
@@ -1396,6 +1393,7 @@ bool initialise_compressor_cores(void) {
     }
 
     // populate with compressor cores
+    malloc_extras_check_all();
     log_info("start populate compression cores");
     for (int core=0; core < n_compression_cores; core++) {
         compressor_cores[core] = compressor_cores_top->core_id[core];
@@ -1403,6 +1401,7 @@ bool initialise_compressor_cores(void) {
     log_info("finished populate compression cores");
 
     // allocate memory for the trackers
+    malloc_extras_check_all();
     log_info("allocate for compressor core midpoints");
     comp_core_mid_point = MALLOC(n_compression_cores * sizeof(int));
     if (comp_core_mid_point == NULL) {

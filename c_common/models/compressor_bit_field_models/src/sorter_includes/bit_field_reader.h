@@ -19,6 +19,7 @@
 #define __BIT_FIELD_READER_H__
 
 #include "helpful_functions.h"
+#include <malloc_extras.h>
 
 //! \brief reads in bitfields
 //! \param[in/out] n_bf_pointer: the pointer to store how many bf addresses

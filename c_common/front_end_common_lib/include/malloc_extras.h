@@ -69,11 +69,13 @@ typedef struct available_sdram_blocks {
 //! \brief the amount of memory hops at the end of the malloc is 4 less than
 //! the total as the first 4 bytes of the malloc is the length the end user
 //! actually asked for in words
-#define MINUS_POINT EXTRA_BYTES - BYTE_TO_WORD
+//#define MINUS_POINT EXTRA_BYTES - BYTE_TO_WORD
+#define MINUS_POINT 60
 
 //! \brief the number of words to put at the end of any malloc, to try to
 //! detect over writes.
-#define BUFFER_WORDS MINUS_POINT / BYTE_TO_WORD
+//#define BUFFER_WORDS MINUS_POINT / BYTE_TO_WORD
+#define BUFFER_WORDS  15
 
 //! \brief the nim size of a malloc-able chunk of a heap which we will put
 //! into the fake heap.
@@ -167,7 +169,8 @@ void * malloc_extras_safe_sdram_malloc_wrapper(uint bytes);
 //! \return: the address of the block of memory to utilise.
 void * safe_malloc(uint bytes);
 
-#define MALLOC safe_malloc
+//#define MALLOC safe_malloc
+#define MALLOC malloc_extras_safe_sdram_malloc_wrapper
 #define FREE   malloc_extras_safe_x_free
 #define FREE_MARKED malloc_extras_safe_x_free_marked
 #define MALLOC_SDRAM malloc_extras_safe_sdram_malloc_wrapper

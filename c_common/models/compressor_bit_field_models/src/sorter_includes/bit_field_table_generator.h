@@ -411,6 +411,8 @@ static inline table_t** bit_field_table_generator_create_bit_field_router_tables
     log_debug("starting the generation of tables by key");
     for (int key_index = 0; key_index < *n_rt_addresses - 1; key_index++) {
 
+        malloc_extras_check_all_marked(1888888);
+
         // holder for the rt address
         table_t *table = NULL;
 

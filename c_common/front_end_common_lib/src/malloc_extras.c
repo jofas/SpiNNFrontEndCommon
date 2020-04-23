@@ -91,7 +91,9 @@ bool malloc_extras_check(void *ptr) {
                 buffer_index++) {
             uint32_t flag = int_pointer[words + buffer_index];
             if (flag != SAFETY_FLAG) {
-                log_error("flag is actually %x for ptr %x", flag, ptr);
+                log_error(
+                    "flag is actually %x for ptr %x in buffer index %d",
+                    flag, ptr, buffer_index);
                 return false;
             }
         }
@@ -187,14 +189,14 @@ void _build_malloc_tracker(void) {
     // malloc tracker
     malloc_points = sark_xalloc(
         stolen_sdram_heap, malloc_points_size * sizeof(void*), 0, ALLOC_LOCK);
+    if (malloc_points == NULL) {
+        log_error("FAILED to allocate the tracker code!");
+        rt_error(RTE_SWERR);
+    }
 
     // set tracker.
     for(int index = 0; index < malloc_points_size; index ++) {
         malloc_points[index] = 0;
-    }
-    if (malloc_points == NULL) {
-        log_error("FAILED to allocate the tracker code!");
-        rt_error(RTE_SWERR);
     }
 }
 
@@ -230,14 +232,14 @@ bool _add_heap_to_collection(
 
         // make life easier by saying blocks have to be bigger than the heap.
         // so all spaces can be used for heaps
-        uchar* address =
+        uchar* b_address =
             sark_xalloc(sv->sdram_heap, size, 0, ALLOC_LOCK);
-        if (address == NULL) {
+        if (b_address == NULL) {
             log_error("failed to allocate %d", size);
             return false;
         }
 
-        list_of_available_blocks[position].sdram_base_address = address;
+        list_of_available_blocks[position].sdram_base_address = b_address;
         list_of_available_blocks[position].size = size;
         stolen_sdram_heap->free_bytes += size;
         position += 1;
@@ -390,6 +392,9 @@ bool malloc_extras_initialise_with_fake_heap(
 bool malloc_extras_initialise_fake_heap(
         available_sdram_blocks *sizes_region) {
 
+    // hard set stolen sdram heap to the default heap. in case no fake heap
+    stolen_sdram_heap = sv->sdram_heap;
+
     /* if planning to track all mallocs and frees to verify no
      overwrites/corruption. build the initial malloc tracker*/
     if (safety) {
@@ -397,7 +402,6 @@ bool malloc_extras_initialise_fake_heap(
     }
 
     // only build the fake heap if there's bits to build with
-    stolen_sdram_heap = sv->sdram_heap;
     if (sizes_region == NULL) {
         return true;
     }
@@ -540,6 +544,9 @@ void _build_bigger_malloc_tracker(void) {
     sark_xfree(stolen_sdram_heap, malloc_points, ALLOC_LOCK);
     malloc_points = temp_pointer;
     malloc_points_size = new_malloc_points_size;
+
+    log_info("built bigger");
+    malloc_extras_check_all();
 }
 
 //! \brief locates a new spot in the malloc tracker. may force a new
@@ -550,12 +557,15 @@ int _find_free_malloc_index(void) {
     int index;
     for (index = 0; index < malloc_points_size; index ++) {
         if (malloc_points[index] == 0) {
+            log_info("returning index %d of size %d", index, malloc_points_size);
             return index;
         }
     }
     // full. rebuild twice as big
     _build_bigger_malloc_tracker();
-    return index + 1;
+    malloc_extras_check_all();
+    log_info("returning index %d of size %d", index, malloc_points_size);
+    return index;
 }
 
 //! \brief allows a search of the SDRAM heap.
@@ -586,7 +596,7 @@ void add_safety_len_and_padding(int* p, uint bytes) {
 
     // add malloc to the malloc tracker.
     int malloc_point_index = _find_free_malloc_index();
-    if (malloc_point_index == -1){
+    if (malloc_point_index == -1) {
         log_error("cant track this malloc. failing");
         rt_error(RTE_SWERR);
     }
@@ -611,7 +621,7 @@ void * malloc_extras_safe_sdram_malloc_wrapper(uint bytes) {
     }
 
     // malloc from SDRAM heap.
-    int * p = _safe_sdram_malloc(bytes);
+    int* p = _safe_sdram_malloc(bytes);
 
     // if safety, add the len and buffers and return location for app code.
     if (safety) {
